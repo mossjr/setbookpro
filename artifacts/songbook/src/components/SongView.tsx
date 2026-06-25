@@ -152,6 +152,46 @@ export default function SongView({ songId }: { songId: string }) {
   const hasMedia =
     song.mediaType === "audio" || song.mediaType === "youtube";
 
+  // Zoom out until the whole song fits inside the scroll viewport. Content
+  // height scales with zoom (font sizes), but fixed margins (section labels,
+  // padding) make it non-linear, so we estimate then refine over a couple of
+  // animation frames until it actually fits.
+  const fitToScreen = () => {
+    const run = (passesLeft: number) => {
+      const node = scrollRef.current;
+      if (!node) return;
+      const cs = getComputedStyle(node);
+      const padY =
+        parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const padX =
+        parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const availH = node.clientHeight - padY;
+      const availW = node.clientWidth - padX;
+      const contentH = node.scrollHeight - padY;
+      const contentW = node.scrollWidth - padX;
+      if (availH <= 0 || contentH <= 0 || availW <= 0 || contentW <= 0)
+        return;
+
+      // Already fully visible (small tolerance for sub-pixel rounding).
+      if (contentH <= availH + 1 && contentW <= availW + 1) return;
+
+      const current = useAppStore.getState().zoom;
+      const ratio = Math.min(availH / contentH, availW / contentW);
+      if (!Number.isFinite(ratio) || ratio <= 0) return;
+      // Round down so a slight under-estimate doesn't re-overflow.
+      const next = Math.max(
+        0.5,
+        Math.min(3, Math.floor(current * ratio * 100) / 100),
+      );
+      if (next >= current) return; // can't shrink further (at min zoom)
+
+      setZoom(next);
+      if (passesLeft > 0)
+        requestAnimationFrame(() => run(passesLeft - 1));
+    };
+    run(3);
+  };
+
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Top Bar */}
@@ -256,6 +296,7 @@ export default function SongView({ songId }: { songId: string }) {
             size="icon"
             className="h-10 w-10 rounded-none"
             onClick={() => setZoom(Math.min(3, zoom + 0.1))}
+            aria-label="Zoom in"
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -263,8 +304,20 @@ export default function SongView({ songId }: { songId: string }) {
           <Button
             variant="ghost"
             size="icon"
+            className="h-10 w-10 rounded-none text-[11px] font-semibold"
+            onClick={fitToScreen}
+            aria-label="Fit song to screen"
+            title="Fit whole song on screen"
+          >
+            Fit
+          </Button>
+          <div className="h-[1px] w-full bg-border" />
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-10 w-10 rounded-none"
             onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+            aria-label="Zoom out"
           >
             <Minus className="w-4 h-4" />
           </Button>
