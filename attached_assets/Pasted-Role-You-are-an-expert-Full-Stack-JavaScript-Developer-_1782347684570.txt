@@ -1,0 +1,154 @@
+Role: You are an expert Full-Stack JavaScript Developer and Software Architect. Your task is to build a Progressive Web App (PWA) called "SongBook Clone" using React (Vite), Node.js, Express, Socket.io, and Replit Postgres.
+
+Core Architecture & Constraints:
+
+Single-Tenant & Shared Library: This is NOT a multi-tenant app. All users share the exact same database of songs, sets, and tags. There are no individual user accounts.
+
+Authentication: The entire app must be protected behind a single login screen. Users enter a password which the backend verifies against a Replit Secret (APP_PASSWORD). If authenticated, issue a simple JWT stored in a cookie/local storage.
+
+PWA: The app must include a manifest.json and service worker so it can be installed on Android/iOS devices and run full-screen.
+
+Data Storage: All data (Songs, Sets, Tags) is saved directly to Replit Postgres. No local JSON file exports or Drive backups are needed.
+
+Please build this application by following these exact phases and specifications.
+
+PHASE 1: DATABASE SCHEMA (REPLIT POSTGRES)
+Create the following tables using an ORM like Prisma or raw SQL:
+
+Songs: id (UUID), title (String), artist (String), meta (String), lyrics_chords (Text), original_ug_id (String, nullable), created_at (Timestamp).
+
+Tags: id (UUID), name (String), color (String).
+
+SongTags: Mapping table for Many-to-Many between Songs and Tags.
+
+Sets: id (UUID), title (String), created_at (Timestamp).
+
+SetSongs: Mapping table between Sets and Songs, must include a sort_order (Int) column.
+
+PHASE 2: ULTIMATE GUITAR API SERVICE (NODE.JS)
+Recreate the Ultimate Guitar API scraping logic in Node.js based on the provided Go parameters. The API requires specific headers and an MD5 hashed key.
+
+1. UG Configuration Variables:
+
+API_ENDPOINT: "https://api.ultimate-guitar.com/api/v1"
+
+USER_AGENT: "UGT_ANDROID/4.11.1 (Pixel; 8.1.0)"
+
+2. Key Generation Function:
+Create a utility function to generate the required headers for every request:
+
+JavaScript
+const crypto = require('crypto');
+
+function getUgHeaders() {
+  // Generate a random 16-character hex string for the device ID
+  const deviceId = crypto.randomBytes(8).toString('hex'); 
+  
+  // Format current UTC time exactly as "YYYY-MM-DD:H" (e.g., "2022-05-13:20")
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  const hour = now.getUTCHours();
+  const formattedDate = `${year}-${month}-${day}:${hour}`;
+  
+  // The string to hash MUST be exactly: deviceId + formattedDate + "createLog()"
+  const strToHash = `${deviceId}${formattedDate}createLog()`;
+  const apiKey = crypto.createHash('md5').update(strToHash).digest('hex');
+
+  return {
+    "Accept-Charset": "utf-8",
+    "Accept": "application/json",
+    "User-Agent": "UGT_ANDROID/4.11.1 (Pixel; 8.1.0)",
+    "X-UG-CLIENT-ID": deviceId,
+    "X-UG-API-KEY": apiKey
+  };
+}
+3. Express API Routes for UG:
+
+GET /api/ug/search?title=...: Fetches /tab/search?title={title}&page=1&type[]=Chords.
+
+GET /api/ug/tab/:id: Fetches /tab/info?tab_id={id}&tab_access_type=private. Parse the response and extract the raw chord/lyrics string to save to the database.
+
+GET /api/ug/explore: Fetches /tab/explore?order=hitsdailygroup_desc&type[]=Chords to show today's most popular tabs.
+
+GET /api/ug/random: Fetches /tab/random to pull a random song chart.
+
+PHASE 3: REAL-TIME WEBSOCKETS (HOST & PARTICIPANT)
+Integrate Socket.io into the Node server to handle real-time gig synchronization. Do NOT sync Metronome ticks (latency makes this unusable). Sync ONLY navigation and scroll events.
+
+Rooms: When a user clicks "Become Host", the server generates a 4-digit HOST CODE and creates a Socket room.
+
+Participant Join: A user clicks "Join Host", enters the 4-digit code, and joins the room.
+
+Sync Events: * song_change: Host changes a song, server broadcasts the Song ID to participants.
+
+scroll_sync: Host scrubs the scroll bar, server broadcasts { position: percentage, speed: active_speed }.
+
+Participant Overrides: The React frontend for Participants must allow them to toggle "Override Host View". If toggled on, the Participant device ignores incoming zoom/column changes but continues to listen to song_change and scroll_sync so the song stays roughly in sync.
+
+PHASE 4: FRONTEND LAYOUT & UI COMPONENTS (REACT)
+1. Left Sidebar (Collapsible):
+
+Tabs: Songs, Sets, Tags, Settings.
+
+Songs Tab: * Search bar (live filtering).
+
+List of songs alphabetically grouped by First Letter.
+
+Multi-select Checkboxes: Select All, Add selected to Set, Delete selected.
+
+Sets Tab: List of Sets. Click to view songs in that Set. Create New Set.
+
+Tags Tab: List of Tags. Click to filter main library.
+
+2. Main Live Display:
+
+Top Bar: Menu toggle (reveals sidebar), Song Title, Artist, Quick Actions (Change Key/Transpose, Scroll Speed Slider, Lyrics Only Mode toggle), Tags button.
+
+Song Body Display Settings (CSS is Critical here):
+
+Use a library like chord-symbol or custom Regex to detect [C] or C#m style chords in the text block and render them distinctly above the lyric lines.
+
+Implement three display flows:
+
+Scroll Mode: Standard vertical scrolling (flex-direction: column).
+
+Split Songs (Columns): Use CSS column-width and column-count. Overflowing text must push to the right as virtual "pages". Tapping the left/right of the screen translates the X-axis to turn the page (like an eBook).
+
+Auto Mode: If the song fits in multi-columns at the current zoom, use Split. If it overflows the screen height, revert to Scroll Mode.
+
+Zoom: Pinch-to-zoom logic. Floating Plus/Minus/Fit/Reset icons. The app must remember the last zoom level the user applied.
+
+3. Floating Action Overlay (Bottom Right):
+
+Play Button: If a Spotify link is associated in the meta, clicking plays it (or opens a Spotify search modal). Long press opens a scrub bar player and trash can to remove association.
+
+Metronome Button: Opens a "Doctor Beat" style modal (Visual tick, audio toggle). Single tap plays/stops. Long press opens BPM settings.
+
+Scroll Scrub Bar: Spans the bottom of the screen. Dragging a playhead left/right adjusts the auto-scroll speed. Indicates approx total run time.
+
+4. Settings & Theming:
+
+Theme: Light/Dark mode, Accent color picker.
+
+Instrument Display: Option to format chords for Guitar or Piano (Default to Piano).
+
+Personalization: Sliders to adjust font-size and colors of Title, Meta, Lyrics, and Chords independently.
+
+5. Import View (Ultimate Guitar Search):
+
+A dedicated view to search UG.
+
+Displays a list of results grouped by Type (Chords, Pro, etc.), ordered by version, showing Star Ratings.
+
+"View" button previews the chart.
+
+"Save to Library" button imports the text, title, and artist directly into the Replit Postgres database and instantly opens it in the Main Live Display. (Default dummy data can be set to the artist "A Soft Focus" for testing).
+
+Execution Instructions for Replit Agent: 1. Initialize the Vite React project and Express backend.
+2. Set up the Postgres database and Prisma schema.
+3. Build the Authentication middleware.
+4. Implement the UG Node API scraper.
+5. Build the React UI, starting with the Main Live display and Chord Transposition logic.
+6. Connect Socket.io for the Host/Participant system.
