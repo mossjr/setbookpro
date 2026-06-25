@@ -4,7 +4,7 @@ import { useAppStore, useSettingsStore } from "@/store";
 import ChordRenderer from "./ChordRenderer";
 import Metronome from "./Metronome";
 import MediaPlayerModal from "./MediaPlayerModal";
-import BottomScrollScrubber from "./BottomScrollScrubber";
+import ScrollScrubber from "./ScrollScrubber";
 import SettingsDialog from "./SettingsDialog";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
@@ -40,6 +40,8 @@ export default function SongView({ songId }: { songId: string }) {
     lyricsOnly,
     setLyricsOnly,
     setSidebarOpen,
+    desktopSidebarOpen,
+    setDesktopSidebarOpen,
   } = useAppStore();
 
   const { titleFontSize, lyricsFontSize, chordsFontSize, accentColor } =
@@ -305,9 +307,27 @@ export default function SongView({ songId }: { songId: string }) {
         </div>
       </header>
 
+      {/* Auto-scroll scrubber — pinned to the top to keep clear of the
+          bottom-edge app-switcher gesture; only used in scroll mode. */}
+      {!isSplit && <ScrollScrubber scrollRef={scrollRef} songId={song.id} />}
+
       {/* Song Body — a stable measured frame that hosts either the scroll
-          viewport or the paginated split pager. */}
-      <div ref={frameRef} className="flex-1 relative overflow-hidden">
+          viewport or the paginated split pager. Tapping the song collapses the
+          desktop sidebar so the music can fill the screen. */}
+      <div
+        ref={frameRef}
+        className="flex-1 relative overflow-hidden"
+        onClick={() => {
+          // Tap the song to give it the full screen — desktop widths only, so
+          // a mobile tap never persists a collapsed sidebar for later desktop use.
+          if (
+            desktopSidebarOpen &&
+            window.matchMedia("(min-width: 768px)").matches
+          ) {
+            setDesktopSidebarOpen(false);
+          }
+        }}
+      >
         {isSplit ? (
           <div className="absolute inset-0" style={{ padding: EDGE }}>
             <div className="relative w-full h-full overflow-hidden">
@@ -412,10 +432,10 @@ export default function SongView({ songId }: { songId: string }) {
         </div>
       )}
 
-      {/* Floating Controls (sit above the scroll scrubber and tap zones) */}
+      {/* Floating Controls (sit above the page-turn tap zones) */}
       <div
         data-no-page-nav
-        className="absolute bottom-[5.5rem] right-4 sm:right-6 flex flex-col gap-3 items-center z-20"
+        className="absolute bottom-6 right-4 sm:right-6 flex flex-col gap-3 items-center z-20"
       >
         <div className="flex flex-col bg-card border border-border shadow-lg rounded-full overflow-hidden">
           <Button
@@ -476,11 +496,6 @@ export default function SongView({ songId }: { songId: string }) {
           {mediaIcon()}
         </Button>
       </div>
-
-      {/* Auto-scroll scrubber — only meaningful in single-column scroll mode. */}
-      {!isSplit && (
-        <BottomScrollScrubber scrollRef={scrollRef} songId={song.id} />
-      )}
 
       <MediaPlayerModal
         song={song}

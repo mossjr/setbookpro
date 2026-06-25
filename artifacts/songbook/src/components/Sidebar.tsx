@@ -47,6 +47,7 @@ import {
   Pencil,
   ListPlus,
   X,
+  PanelLeftClose,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportLibrary, parseImportFile } from "@/lib/importExport";
@@ -54,7 +55,8 @@ import SongEditorDialog from "@/components/SongEditorDialog";
 import TagsManager from "@/components/TagsManager";
 
 export default function Sidebar() {
-  const { selectedSongId, setSelectedSongId, setSidebarOpen } = useAppStore();
+  const { selectedSongId, setSelectedSongId, setSidebarOpen, setDesktopSidebarOpen } =
+    useAppStore();
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -271,10 +273,22 @@ export default function Sidebar() {
   return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="p-4 border-b border-sidebar-border">
-        <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
-          <Music className="w-5 h-5 text-primary" />
-          SongBook
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Music className="w-5 h-5 text-primary" />
+            SongBook
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex h-8 w-8 text-muted-foreground"
+            onClick={() => setDesktopSidebarOpen(false)}
+            aria-label="Hide sidebar"
+            title="Hide sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </Button>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-sidebar-accent/50">

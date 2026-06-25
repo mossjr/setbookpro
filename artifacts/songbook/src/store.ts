@@ -48,6 +48,9 @@ interface AppState {
   setZoom: (zoom: number) => void;
   isSidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  desktopSidebarOpen: boolean;
+  setDesktopSidebarOpen: (open: boolean) => void;
+  toggleDesktopSidebar: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -151,6 +154,10 @@ export const useAppStore = create<AppState>()(
       setZoom: (zoom) => set({ zoom }),
       isSidebarOpen: false,
       setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
+      desktopSidebarOpen: true,
+      setDesktopSidebarOpen: (desktopSidebarOpen) => set({ desktopSidebarOpen }),
+      toggleDesktopSidebar: () =>
+        set((s) => ({ desktopSidebarOpen: !s.desktopSidebarOpen })),
     }),
     {
       name: 'songbook-app-state',
@@ -166,7 +173,8 @@ export const useAppStore = create<AppState>()(
         token: state.token, 
         zoom: state.zoom, 
         displayMode: state.displayMode,
-        lyricsOnly: state.lyricsOnly
+        lyricsOnly: state.lyricsOnly,
+        desktopSidebarOpen: state.desktopSidebarOpen
       }),
     }
   )

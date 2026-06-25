@@ -9,7 +9,7 @@ import {
 import { useSettingsStore } from "@/store";
 import { Play, Pause } from "lucide-react";
 
-interface BottomScrollScrubberProps {
+interface ScrollScrubberProps {
   scrollRef: RefObject<HTMLDivElement | null>;
   songId: string;
 }
@@ -32,10 +32,10 @@ function posToSpeed(pos: number, min: number, base: number, max: number) {
   return Math.round(speed);
 }
 
-export default function BottomScrollScrubber({
+export default function ScrollScrubber({
   scrollRef,
   songId,
-}: BottomScrollScrubberProps) {
+}: ScrollScrubberProps) {
   const {
     autoScrollSpeed,
     autoScrollMinSpeed,
@@ -179,7 +179,7 @@ export default function BottomScrollScrubber({
   const active = isScrolling || countdown > 0;
 
   return (
-    <div className="relative h-20 w-full shrink-0 border-t border-border bg-card select-none">
+    <div className="relative h-20 w-full shrink-0 border-b border-border bg-card select-none">
       {/* Edge + center labels */}
       <div className="absolute inset-x-6 top-2 flex justify-between text-[10px] font-medium uppercase tracking-wide text-muted-foreground pointer-events-none">
         <span>Slower</span>
