@@ -2,48 +2,39 @@ import { useMemo } from "react";
 import { transposeLyricsChords } from "@/lib/chords";
 
 // ---------------------------------------------------------------------------
-// Types
+// Parsing
 // ---------------------------------------------------------------------------
 
 interface Segment {
-  chord: string | null; // chord name, or null for plain lyric text
-  lyric: string;        // lyric text that follows the chord (or stands alone)
+  chord: string | null;
+  lyric: string;
 }
 
-// ---------------------------------------------------------------------------
-// Parsing helpers
-// ---------------------------------------------------------------------------
-
-// Splits a line into segments.
 // "[Am]Heart beats [E]fast"
 //   → [{ chord:"Am", lyric:"Heart beats " }, { chord:"E", lyric:"fast" }]
 // "Colors and pro[F#m]mises"
 //   → [{ chord:null, lyric:"Colors and pro" }, { chord:"F#m", lyric:"mises" }]
 function parseLine(line: string): Segment[] {
-  // Only treat as chord if it starts with A-G (avoids matching [Verse 1] etc.)
+  // Only match real chords (A–G prefix). [Verse 1], [Chorus] etc. won't match.
   const parts = line.split(/\[([A-G][^\]]*)\]/);
-  // parts = [text, chord, text, chord, text, ...]
+  // parts = [text0, chord1, text1, chord2, text2, ...]
   const segments: Segment[] = [];
 
-  // Leading lyric before the first chord
   if (parts[0]) segments.push({ chord: null, lyric: parts[0] });
 
   for (let i = 1; i < parts.length; i += 2) {
     segments.push({ chord: parts[i], lyric: parts[i + 1] ?? "" });
   }
 
-  // Fallback: plain line with no chords
   if (segments.length === 0) segments.push({ chord: null, lyric: line });
 
   return segments;
 }
 
-// Detect section headers like [Verse 1], [Chorus], [Bridge]
+// Detect [Verse 1], [Chorus], etc. (not starting with A-G, so not a chord)
 function parseSectionLabel(line: string): string | null {
-  const trimmed = line.trim();
-  const m = trimmed.match(/^\[([^\]]+)\]$/);
-  if (!m) return null;
-  if (/^[A-G]/.test(m[1])) return null; // chord, not a label
+  const m = line.trim().match(/^\[([^\]]+)\]$/);
+  if (!m || /^[A-G]/.test(m[1])) return null;
   return m[1];
 }
 
@@ -81,31 +72,22 @@ export default function ChordRenderer({
 
   const lyricsSize = lyricsFontSize * zoom;
   const chordsSize = chordsFontSize * zoom;
-  // Vertical space reserved above each lyric line for the chord name
-  const chordReserved = chordsSize * 1.7;
 
   // ---- LYRICS ONLY mode --------------------------------------------------
   if (lyricsOnly) {
     return (
-      <div
-        className="text-foreground"
-        style={{ fontSize: lyricsSize, lineHeight: 1.75, fontFamily: "inherit" }}
-      >
+      <div className="text-foreground" style={{ fontSize: lyricsSize, lineHeight: 1.75 }}>
         {lines.map((line, i) => {
           const label = parseSectionLabel(line);
           if (label) {
             return (
-              <div
-                key={i}
-                className="font-bold text-primary/80 mt-6 mb-1"
-                style={{ fontSize: lyricsSize * 0.85 }}
-              >
+              <div key={i} className="font-bold text-primary/80 mt-6 mb-1" style={{ fontSize: lyricsSize * 0.85 }}>
                 {label}
               </div>
             );
           }
           const lyric = line.replace(/\[([A-G][^\]]*)\]/g, "");
-          if (!lyric.trim()) return <div key={i} style={{ height: lyricsSize * 0.6 }} />;
+          if (!lyric.trim()) return <div key={i} style={{ height: lyricsSize * 0.5 }} />;
           return (
             <div key={i} style={{ whiteSpace: "pre-wrap" }}>
               {lyric}
@@ -118,22 +100,18 @@ export default function ChordRenderer({
 
   // ---- CHORD + LYRIC mode ------------------------------------------------
   return (
-    <div className="text-foreground" style={{ fontSize: lyricsSize, fontFamily: "inherit" }}>
+    <div className="text-foreground" style={{ fontFamily: "inherit" }}>
       {lines.map((line, i) => {
-        // Blank line — small gap
+        // Blank line → small gap
         if (!line.trim()) {
-          return <div key={i} style={{ height: chordReserved * 0.5 }} />;
+          return <div key={i} style={{ height: lyricsSize * 0.75 }} />;
         }
 
-        // Section header — e.g. [Verse 1]
+        // Section header → styled label
         const label = parseSectionLabel(line);
         if (label) {
           return (
-            <div
-              key={i}
-              className="font-bold text-primary/80 mt-6 mb-1"
-              style={{ fontSize: lyricsSize * 0.85 }}
-            >
+            <div key={i} className="font-bold text-primary/80 mt-6 mb-1" style={{ fontSize: lyricsSize * 0.85 }}>
               {label}
             </div>
           );
@@ -142,62 +120,68 @@ export default function ChordRenderer({
         const segments = parseLine(line);
         const lineHasChords = segments.some((s) => s.chord !== null);
 
-        // Pure lyric line — render simply, no extra padding
+        // Pure lyric line — no chord row needed at all
         if (!lineHasChords) {
           return (
-            <div
-              key={i}
-              style={{
-                whiteSpace: "pre",
-                lineHeight: 1.6,
-                marginBottom: 2,
-              }}
-            >
+            <div key={i} style={{ whiteSpace: "pre", lineHeight: 1.65, fontSize: lyricsSize, marginBottom: 2 }}>
               {segments[0]?.lyric ?? ""}
             </div>
           );
         }
 
-        // Line with chords — each segment is an inline-block with room above for the chord
+        // Line with chords — use inline-flex column per segment so the
+        // container is as wide as whichever of chord or lyric is wider.
+        // This is critical for chord-only lines (intro riffs, etc.) where
+        // the lyric slot is empty — the segment width is set by the chord.
         return (
-          <div key={i} style={{ lineHeight: 1, marginBottom: 6, display: "block" }}>
-            {segments.map((seg, j) => (
-              <span
-                key={j}
-                style={{
-                  display: "inline-block",
-                  position: "relative",
-                  verticalAlign: "top",
-                  // Reserve space above the lyric text for the chord name
-                  paddingTop: chordReserved,
-                  // Preserve whitespace so spaces act as horizontal spacers
-                  whiteSpace: "pre",
-                }}
-              >
-                {/* Chord name floating above the lyric */}
-                {seg.chord && (
+          <div key={i} style={{ marginBottom: 4, lineHeight: 1 }}>
+            {segments.map((seg, j) => {
+              // Lyric text for this segment. For a chord-only segment,
+              // use a non-breaking space so the segment has non-zero height
+              // but the chord name itself sets the width via the flex column.
+              const lyricText = seg.lyric !== "" ? seg.lyric : seg.chord ? "\u00a0" : "";
+
+              return (
+                <span
+                  key={j}
+                  style={{
+                    display: "inline-flex",
+                    flexDirection: "column",
+                    verticalAlign: "bottom",
+                    // Allow chord to be wider than lyric: the flex container
+                    // naturally becomes max(chord width, lyric width).
+                    alignItems: "flex-start",
+                  }}
+                >
+                  {/* ── Chord row ── */}
                   <span
-                    className="text-primary font-bold select-none"
+                    className={seg.chord ? "text-primary font-bold select-none" : ""}
                     style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
                       fontSize: chordsSize,
-                      lineHeight: 1,
-                      // Allow chord to overflow to the right without wrapping
+                      lineHeight: 1.3,
+                      // nowrap keeps long chord names (e.g. Cmaj7sus4) on one line
                       whiteSpace: "nowrap",
+                      // When no chord, emit a non-breaking space to hold the row
+                      // height so all lyric baselines stay on the same line.
+                      paddingRight: seg.chord ? "0.4em" : 0,
                     }}
                   >
-                    {seg.chord}
+                    {seg.chord ?? "\u00a0"}
                   </span>
-                )}
-                {/* Lyric text. If empty after a chord, emit a non-breaking space so the
-                    inline-block has non-zero width and the chord is visible. */}
-                <span style={{ whiteSpace: "pre" }}>
-                  {seg.lyric !== "" ? seg.lyric : seg.chord ? "\u00a0" : ""}
+
+                  {/* ── Lyric row ── */}
+                  <span
+                    style={{
+                      fontSize: lyricsSize,
+                      lineHeight: 1.65,
+                      whiteSpace: "pre",
+                    }}
+                  >
+                    {lyricText}
+                  </span>
                 </span>
-              </span>
-            ))}
+              );
+            })}
           </div>
         );
       })}
