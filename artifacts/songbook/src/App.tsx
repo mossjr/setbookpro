@@ -19,7 +19,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, setToken } = useAppStore();
   const { data: me, isLoading, error } = useGetMe({ 
     query: { 
-      enabled: true, 
+      enabled: !token,
       queryKey: getGetMeQueryKey(),
       retry: false
     } 
@@ -29,12 +29,15 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (error) {
       setToken(null);
       localStorage.removeItem("songbook_token");
-    } else if (me?.token) {
-      setToken(me.token);
-      localStorage.setItem("songbook_token", me.token);
     }
-  }, [me, error, setToken]);
+  }, [error, setToken]);
 
+  // If we already have a token (just logged in or restored from storage), show the app.
+  if (token) {
+    return <>{children}</>;
+  }
+
+  // Otherwise wait for the /me check on initial load.
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -43,7 +46,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!me?.authenticated || !token) {
+  if (!me?.authenticated) {
     return <Login />;
   }
 
