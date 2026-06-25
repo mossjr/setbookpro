@@ -34,3 +34,27 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
   next();
 }
+
+/**
+ * Like requireAuth, but also accepts the token via a `?token=` query param.
+ * Needed for media elements (e.g. <audio src>) that cannot attach an
+ * Authorization header when fetching private uploaded files.
+ */
+export function requireAuthAllowQuery(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const authHeader = req.headers.authorization;
+  let token: string | undefined;
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if (typeof req.query.token === "string") {
+    token = req.query.token;
+  }
+  if (!token || !verifyToken(token)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}

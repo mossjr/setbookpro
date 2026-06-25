@@ -5,6 +5,7 @@
  * SongBook API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SongMediaType } from './songMediaType';
 import type { Tag } from './tag';
 
 export interface Song {
@@ -18,6 +19,17 @@ export interface Song {
   originalUgId?: string | null;
   /** @nullable */
   spotifyLink?: string | null;
+  mediaType: SongMediaType;
+  /** @nullable */
+  audioUrl?: string | null;
+  /** @nullable */
+  audioFileName?: string | null;
+  /** @nullable */
+  audioContentType?: string | null;
+  /** @nullable */
+  audioSize?: number | null;
+  /** @nullable */
+  youtubeUrl?: string | null;
   createdAt: string;
   tags?: Tag[];
 }

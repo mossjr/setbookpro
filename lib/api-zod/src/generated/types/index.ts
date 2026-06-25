@@ -7,6 +7,7 @@
  */
 
 export * from './authResult';
+export * from './errorEnvelope';
 export * from './healthStatus';
 export * from './libraryStats';
 export * from './listSongsParams';
@@ -16,11 +17,14 @@ export * from './setSong';
 export * from './setSongAdd';
 export * from './song';
 export * from './songInput';
+export * from './songInputMediaType';
+export * from './songMediaType';
 export * from './songSet';
 export * from './songSetDetail';
 export * from './songSetInput';
 export * from './songSetUpdate';
 export * from './songUpdate';
+export * from './songUpdateMediaType';
 export * from './successResult';
 export * from './tag';
 export * from './tagAssignment';
@@ -31,3 +35,5 @@ export * from './ugSearchParams';
 export * from './ugSearchResults';
 export * from './ugTab';
 export * from './ugTabSummary';
+export * from './uploadUrlRequest';
+export * from './uploadUrlResponse';

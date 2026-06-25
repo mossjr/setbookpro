@@ -20,6 +20,8 @@ tags:
     description: Set operations
   - name: ug
     description: Ultimate Guitar integration
+  - name: Storage
+    description: Object storage upload and serving endpoints.
 paths:
   /healthz:
     get:
@@ -550,6 +552,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/Song"
 
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. The client sends JSON
+        metadata here, then uploads the file directly to the returned URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      description: |
+        Serves object entities uploaded via presigned URLs. Supports HTTP Range
+        requests for media scrubbing.
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Object path within the private object dir (e.g. `uploads/some-uuid`).
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Object not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to serve object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   schemas:
     HealthStatus:
@@ -567,6 +638,44 @@ components:
           type: boolean
       required:
         - success
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Original file name.
+        size:
+          type: integer
+          minimum: 1
+          description: File size in bytes.
+        contentType:
+          type: string
+          minLength: 1
+          description: MIME type of the file (e.g. `audio/mpeg`).
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+          description: Presigned GCS URL for PUT upload.
+        objectPath:
+          type: string
+          description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
 
     LoginInput:
       type: object
@@ -621,7 +730,7 @@ components:
 
     Song:
       type: object
-      required: [id, title, artist, lyricsChords, createdAt]
+      required: [id, title, artist, lyricsChords, mediaType, createdAt]
       properties:
         id:
           type: string
@@ -636,6 +745,19 @@ components:
         originalUgId:
           type: ["string", "null"]
         spotifyLink:
+          type: ["string", "null"]
+        mediaType:
+          type: string
+          enum: [none, audio, spotify, youtube]
+        audioUrl:
+          type: ["string", "null"]
+        audioFileName:
+          type: ["string", "null"]
+        audioContentType:
+          type: ["string", "null"]
+        audioSize:
+          type: ["integer", "null"]
+        youtubeUrl:
           type: ["string", "null"]
         createdAt:
           type: string
@@ -658,6 +780,11 @@ components:
           type: string
         spotifyLink:
           type: string
+        youtubeUrl:
+          type: string
+        mediaType:
+          type: string
+          enum: [none, audio, spotify, youtube]
 
     SongUpdate:
       type: object
@@ -671,6 +798,19 @@ components:
         lyricsChords:
           type: string
         spotifyLink:
+          type: ["string", "null"]
+        mediaType:
+          type: string
+          enum: [none, audio, spotify, youtube]
+        audioUrl:
+          type: ["string", "null"]
+        audioFileName:
+          type: ["string", "null"]
+        audioContentType:
+          type: ["string", "null"]
+        audioSize:
+          type: ["integer", "null"]
+        youtubeUrl:
           type: ["string", "null"]
 
     SongSet:

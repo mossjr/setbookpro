@@ -5,6 +5,7 @@
  * SongBook API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SongInputMediaType } from './songInputMediaType';
 
 export interface SongInput {
   title: string;
@@ -12,4 +13,6 @@ export interface SongInput {
   meta?: string;
   lyricsChords: string;
   spotifyLink?: string;
+  youtubeUrl?: string;
+  mediaType?: SongInputMediaType;
 }

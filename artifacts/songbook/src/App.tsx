@@ -66,7 +66,8 @@ function Router() {
 
 function App() {
   const theme = useSettingsStore(state => state.theme) || 'dark';
-  
+  const accentColor = useSettingsStore(state => state.accentColor);
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
@@ -78,6 +79,14 @@ function App() {
       root.classList.add(theme);
     }
   }, [theme]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (accentColor) {
+      root.style.setProperty('--primary', accentColor);
+      root.style.setProperty('--accent', accentColor);
+    }
+  }, [accentColor]);
 
   return (
     <QueryClientProvider client={queryClient}>

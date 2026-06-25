@@ -13,6 +13,36 @@ export interface SuccessResult {
   success: boolean;
 }
 
+export interface ErrorEnvelope {
+  error: string;
+}
+
+export interface UploadUrlRequest {
+  /**
+     * Original file name.
+     * @minLength 1
+     */
+  name: string;
+  /**
+     * File size in bytes.
+     * @minimum 1
+     */
+  size: number;
+  /**
+     * MIME type of the file (e.g. `audio/mpeg`).
+     * @minLength 1
+     */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  /** Presigned GCS URL for PUT upload. */
+  uploadURL: string;
+  /** Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database. */
+  objectPath: string;
+  metadata?: UploadUrlRequest;
+}
+
 export interface LoginInput {
   password: string;
 }
@@ -43,6 +73,16 @@ export interface TagAssignment {
   tagId: string;
 }
 
+export type SongMediaType = typeof SongMediaType[keyof typeof SongMediaType];
+
+
+export const SongMediaType = {
+  none: 'none',
+  audio: 'audio',
+  spotify: 'spotify',
+  youtube: 'youtube',
+} as const;
+
 export interface Song {
   id: string;
   title: string;
@@ -54,9 +94,30 @@ export interface Song {
   originalUgId?: string | null;
   /** @nullable */
   spotifyLink?: string | null;
+  mediaType: SongMediaType;
+  /** @nullable */
+  audioUrl?: string | null;
+  /** @nullable */
+  audioFileName?: string | null;
+  /** @nullable */
+  audioContentType?: string | null;
+  /** @nullable */
+  audioSize?: number | null;
+  /** @nullable */
+  youtubeUrl?: string | null;
   createdAt: string;
   tags?: Tag[];
 }
+
+export type SongInputMediaType = typeof SongInputMediaType[keyof typeof SongInputMediaType];
+
+
+export const SongInputMediaType = {
+  none: 'none',
+  audio: 'audio',
+  spotify: 'spotify',
+  youtube: 'youtube',
+} as const;
 
 export interface SongInput {
   title: string;
@@ -64,7 +125,19 @@ export interface SongInput {
   meta?: string;
   lyricsChords: string;
   spotifyLink?: string;
+  youtubeUrl?: string;
+  mediaType?: SongInputMediaType;
 }
+
+export type SongUpdateMediaType = typeof SongUpdateMediaType[keyof typeof SongUpdateMediaType];
+
+
+export const SongUpdateMediaType = {
+  none: 'none',
+  audio: 'audio',
+  spotify: 'spotify',
+  youtube: 'youtube',
+} as const;
 
 export interface SongUpdate {
   title?: string;
@@ -73,6 +146,17 @@ export interface SongUpdate {
   lyricsChords?: string;
   /** @nullable */
   spotifyLink?: string | null;
+  mediaType?: SongUpdateMediaType;
+  /** @nullable */
+  audioUrl?: string | null;
+  /** @nullable */
+  audioFileName?: string | null;
+  /** @nullable */
+  audioContentType?: string | null;
+  /** @nullable */
+  audioSize?: number | null;
+  /** @nullable */
+  youtubeUrl?: string | null;
 }
 
 export interface SongSet {

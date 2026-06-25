@@ -62,6 +62,12 @@ export const ListSongsResponseItem = zod.object({
   "lyricsChords": zod.string(),
   "originalUgId": zod.string().nullish(),
   "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish(),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -80,7 +86,9 @@ export const CreateSongBody = zod.object({
   "artist": zod.string(),
   "meta": zod.string().optional(),
   "lyricsChords": zod.string(),
-  "spotifyLink": zod.string().optional()
+  "spotifyLink": zod.string().optional(),
+  "youtubeUrl": zod.string().optional(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']).optional()
 })
 
 
@@ -99,6 +107,12 @@ export const GetSongStatsResponse = zod.object({
   "lyricsChords": zod.string(),
   "originalUgId": zod.string().nullish(),
   "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish(),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -124,6 +138,12 @@ export const GetSongResponse = zod.object({
   "lyricsChords": zod.string(),
   "originalUgId": zod.string().nullish(),
   "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish(),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -145,7 +165,13 @@ export const UpdateSongBody = zod.object({
   "artist": zod.string().optional(),
   "meta": zod.string().optional(),
   "lyricsChords": zod.string().optional(),
-  "spotifyLink": zod.string().nullish()
+  "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']).optional(),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish()
 })
 
 export const UpdateSongResponse = zod.object({
@@ -156,6 +182,12 @@ export const UpdateSongResponse = zod.object({
   "lyricsChords": zod.string(),
   "originalUgId": zod.string().nullish(),
   "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish(),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -192,6 +224,12 @@ export const AddTagToSongResponse = zod.object({
   "lyricsChords": zod.string(),
   "originalUgId": zod.string().nullish(),
   "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish(),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -217,6 +255,12 @@ export const RemoveTagFromSongResponse = zod.object({
   "lyricsChords": zod.string(),
   "originalUgId": zod.string().nullish(),
   "spotifyLink": zod.string().nullish(),
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']),
+  "audioUrl": zod.string().nullish(),
+  "audioFileName": zod.string().nullish(),
+  "audioContentType": zod.string().nullish(),
+  "audioSize": zod.number().nullish(),
+  "youtubeUrl": zod.string().nullish(),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -476,6 +520,50 @@ export const UgImportTabBody = zod.object({
   "artist": zod.string(),
   "meta": zod.string().optional(),
   "lyricsChords": zod.string()
+})
+
+
+/**
+ * Returns a presigned GCS URL for direct upload. The client sends JSON
+metadata here, then uploads the file directly to the returned URL.
+
+ * @summary Request a presigned URL for file upload
+ */
+
+
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `audio\/mpeg`).')
+})
+
+
+
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().url().describe('Presigned GCS URL for PUT upload.'),
+  "objectPath": zod.string().describe('Normalized object path (e.g. `\/objects\/uploads\/uuid`). Store this in your database.'),
+  "metadata": zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `audio\/mpeg`).')
+}).optional()
+})
+
+
+/**
+ * Serves object entities uploaded via presigned URLs. Supports HTTP Range
+requests for media scrubbing.
+
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string().describe('Object path within the private object dir (e.g. `uploads\/some-uuid`).')
 })
 
 

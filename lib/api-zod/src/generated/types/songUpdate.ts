@@ -5,6 +5,7 @@
  * SongBook API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SongUpdateMediaType } from './songUpdateMediaType';
 
 export interface SongUpdate {
   title?: string;
@@ -13,4 +14,15 @@ export interface SongUpdate {
   lyricsChords?: string;
   /** @nullable */
   spotifyLink?: string | null;
+  mediaType?: SongUpdateMediaType;
+  /** @nullable */
+  audioUrl?: string | null;
+  /** @nullable */
+  audioFileName?: string | null;
+  /** @nullable */
+  audioContentType?: string | null;
+  /** @nullable */
+  audioSize?: number | null;
+  /** @nullable */
+  youtubeUrl?: string | null;
 }

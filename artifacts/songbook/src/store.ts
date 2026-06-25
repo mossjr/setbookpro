@@ -16,6 +16,20 @@ interface SettingsState {
   setChordsFontSize: (size: number) => void;
   instrument: 'guitar' | 'piano';
   setInstrument: (inst: 'guitar' | 'piano') => void;
+  // Auto-scroll (px per second).
+  autoScrollSpeed: number;
+  setAutoScrollSpeed: (speed: number) => void;
+  autoScrollMinSpeed: number;
+  setAutoScrollMinSpeed: (speed: number) => void;
+  autoScrollMaxSpeed: number;
+  setAutoScrollMaxSpeed: (speed: number) => void;
+  autoScrollStartDelay: number;
+  setAutoScrollStartDelay: (seconds: number) => void;
+  // Metronome.
+  metronomeFlash: boolean;
+  setMetronomeFlash: (on: boolean) => void;
+  metronomeSound: boolean;
+  setMetronomeSound: (on: boolean) => void;
 }
 
 interface AppState {
@@ -48,6 +62,19 @@ export const useSettingsStore = create<SettingsState>()(
       setChordsFontSize: (chordsFontSize) => set({ chordsFontSize }),
       instrument: 'guitar',
       setInstrument: (instrument) => set({ instrument }),
+      autoScrollSpeed: 40,
+      setAutoScrollSpeed: (autoScrollSpeed) => set({ autoScrollSpeed }),
+      autoScrollMinSpeed: 10,
+      setAutoScrollMinSpeed: (autoScrollMinSpeed) => set({ autoScrollMinSpeed }),
+      autoScrollMaxSpeed: 200,
+      setAutoScrollMaxSpeed: (autoScrollMaxSpeed) => set({ autoScrollMaxSpeed }),
+      autoScrollStartDelay: 0,
+      setAutoScrollStartDelay: (autoScrollStartDelay) =>
+        set({ autoScrollStartDelay }),
+      metronomeFlash: false,
+      setMetronomeFlash: (metronomeFlash) => set({ metronomeFlash }),
+      metronomeSound: true,
+      setMetronomeSound: (metronomeSound) => set({ metronomeSound }),
     }),
     { name: 'songbook-settings' }
   )

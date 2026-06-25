@@ -23,5 +23,10 @@ UG API returns content with `[ch]Am[/ch]` markers. These are stripped to `[Am]` 
 
 **Why:** Keeps a single consistent chord marker format throughout the system.
 
+## Private media serving (audio uploads)
+Uploaded audio lives in private object storage and is served via `GET /api/storage/objects/*`, which is auth-guarded by `requireAuthAllowQuery` — it accepts the JWT via either the `Authorization: Bearer` header **or** a `?token=` query param. The client's `resolveAudioUrl()` appends `?token=<songbook_token>` to the URL it puts in `<audio src>`. The route keeps HTTP Range (206) support so scrubbing works. Upload size/MIME limits (audio/*, ≤50 MB) are enforced server-side in the `request-url` handler, not on the signed PUT.
+
+**Why:** `<audio>`/`<video>` elements cannot attach an Authorization header, so a header-only guard would break playback; query-token auth was chosen over short-lived signed GET URLs to avoid an extra OpenAPI endpoint + codegen + async URL-refresh complexity. The Replit signed-URL sidecar only binds bucket/object/method/expires (not content-type/length), so PUT constraints must be validated at request-url issuance time.
+
 ## Lib rebuild rule
 After changing `lib/db/src/schema/` or `lib/api-spec/openapi.yaml`, always run `pnpm run typecheck:libs` before checking leaf packages. Missing exports from `@workspace/db` are almost always stale declarations, not bad imports.
