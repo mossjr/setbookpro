@@ -6,6 +6,7 @@ export interface YouTubeController {
   currentTime: number;
   duration: number;
   ready: boolean;
+  hasSource: boolean;
   play: () => void;
   pause: () => void;
   toggle: () => void;
@@ -97,5 +98,15 @@ export function useYouTubePlayer(
     setCurrentTime(time);
   }, []);
 
-  return { isPlaying, currentTime, duration, ready, play, pause, toggle, seek };
+  return {
+    isPlaying,
+    currentTime,
+    duration,
+    ready,
+    hasSource: !!videoId,
+    play,
+    pause,
+    toggle,
+    seek,
+  };
 }

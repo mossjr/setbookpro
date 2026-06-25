@@ -33,5 +33,12 @@ Spotify search uses the Web API **Client Credentials** flow (`SPOTIFY_CLIENT_ID`
 
 **Why:** Spotify has no keyless search; Client Credentials avoids per-user OAuth since the app has no user accounts. The 503-vs-empty-results split lets the UI distinguish "needs setup" from "no matches". YouTube has no free official search API, so scraping mirrors the existing UG approach. Untrusted external HTML/JSON is parsed under hard caps (fetch timeout, response-size cap, recursion depth + node-count caps) to prevent a slow/huge/hostile response from exhausting an authenticated request — keep these caps when touching the scraper.
 
+## Per-song media player (continuous playback across modal toggles)
+YouTube/Spotify share ONE persistent host DOM node (`document.createElement`, lazy-init in `ytHostRef` during render). React renders the player markup INTO it via `createPortal`, so the contents stay outside reconciliation. A `useLayoutEffect` relocates the host with `appendChild` between an always-mounted closed-state mini-player slot and the `MediaPlayerModal`'s slot (mounted only while open). `MediaPlayerModal` does NOT own the YouTube hook — it receives the `youtube` controller + `youtubeSlotRef` as props. The floating icon: tap toggles the active controllable source (audio/youtube) or opens the modal (spotify/none); long-press (500ms) always opens the modal.
+
+**Why:** A normally-mounted iframe is destroyed (and reloaded → playback restarts) whenever its React owner unmounts. Hoisting it into a single relocatable node keeps the same DOM/iframe alive so audio + YouTube keep playing when the modal closes.
+
+**How to apply:** The Radix Dialog unmounts its whole subtree on close, and the host is an imperative `appendChild` child of the modal slot — so closing would tear the host down WITH the dialog before any layout effect could rescue it. The close path (`onOpenChange(false)` → `handleMediaOpenChange`) must SYNCHRONOUSLY append the host back to the always-mounted closed slot BEFORE `setMediaOpen(false)`. Do not convert this to effect-only relocation. Spotify is embed-only: it cannot be programmatically played/paused/scrubbed (platform limitation) — switching `mediaType` unmounts its iframe after persistence, which is the practical limit of control.
+
 ## Lib rebuild rule
 After changing `lib/db/src/schema/` or `lib/api-spec/openapi.yaml`, always run `pnpm run typecheck:libs` before checking leaf packages. Missing exports from `@workspace/db` are almost always stale declarations, not bad imports.

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, type RefObject } from "react";
 import {
   type Song,
   type MediaSearchItem,
@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { type AudioController } from "@/hooks/useAudioPlayer";
-import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
+import { type YouTubeController } from "@/hooks/useYouTubePlayer";
 import { useAudioUpload } from "@/lib/upload";
 import { parseYouTubeId } from "@/lib/youtube";
 import { parseSpotifyEmbedUrl, formatTime } from "@/lib/media";
@@ -44,6 +44,8 @@ import {
 interface MediaPlayerModalProps {
   song: Song;
   audio: AudioController;
+  youtube: YouTubeController;
+  youtubeSlotRef: RefObject<HTMLDivElement | null>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -176,6 +178,8 @@ function SearchResults({
 export default function MediaPlayerModal({
   song,
   audio,
+  youtube,
+  youtubeSlotRef,
   open,
   onOpenChange,
 }: MediaPlayerModalProps) {
@@ -214,7 +218,6 @@ export default function MediaPlayerModal({
   }, [song.id, song.title, song.artist]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const ytWrapperRef = useRef<HTMLDivElement>(null);
 
   const audioConfigured = !!song.audioUrl;
   const spotifyConfigured = !!song.spotifyLink;
@@ -222,14 +225,6 @@ export default function MediaPlayerModal({
     ? parseYouTubeId(song.youtubeUrl)
     : null;
   const youtubeConfigured = !!youtubeVideoId;
-  const spotifyEmbed = song.spotifyLink
-    ? parseSpotifyEmbedUrl(song.spotifyLink)
-    : null;
-
-  const yt = useYouTubePlayer(
-    ytWrapperRef,
-    open && song.mediaType === "youtube" ? youtubeVideoId : null,
-  );
 
   const spotifySearch = useSearchSpotify(
     { q: spQuery },
@@ -273,8 +268,9 @@ export default function MediaPlayerModal({
   };
 
   const setActive = (type: SongUpdateMediaType) => {
-    // Stop any uploaded audio still playing when switching to another source.
+    // Stop whichever controllable source is no longer the active one.
     if (type !== "audio") audio.pause();
+    if (type !== "youtube") youtube.pause();
     persist({ mediaType: type });
   };
 
@@ -288,6 +284,7 @@ export default function MediaPlayerModal({
       toast({ title: "Upload failed", variant: "destructive" });
       return;
     }
+    youtube.pause();
     persist({
       mediaType: "audio",
       audioUrl: result.objectPath,
@@ -316,6 +313,7 @@ export default function MediaPlayerModal({
       return;
     }
     audio.pause();
+    youtube.pause();
     persist({ mediaType: "spotify", spotifyLink: spotifyInput.trim() });
   };
 
@@ -334,11 +332,13 @@ export default function MediaPlayerModal({
     persist({ mediaType: "youtube", youtubeUrl: youtubeInput.trim() });
   };
 
-  const removeYoutube = () =>
+  const removeYoutube = () => {
+    youtube.pause();
     persist({
       mediaType: song.mediaType === "youtube" ? "none" : song.mediaType,
       youtubeUrl: null,
     });
+  };
 
   const runSpotifySearch = () => {
     const term = spTerm.trim();
@@ -363,6 +363,7 @@ export default function MediaPlayerModal({
       return;
     }
     audio.pause();
+    youtube.pause();
     setSpotifyInput(item.url);
     persist({ mediaType: "spotify", spotifyLink: item.url });
     setSpSearchOpen(false);
@@ -450,32 +451,31 @@ export default function MediaPlayerModal({
             </div>
           )}
 
-          {song.mediaType === "youtube" && youtubeConfigured && (
+          {(song.mediaType === "youtube" || song.mediaType === "spotify") && (
             <div className="space-y-3">
-              <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
-                <div ref={ytWrapperRef} className="w-full h-full" />
-              </div>
-              <MediaTransport
-                isPlaying={yt.isPlaying}
-                currentTime={yt.currentTime}
-                duration={yt.duration}
-                onToggle={yt.toggle}
-                onSeek={yt.seek}
-                disabled={!yt.ready}
+              {/* The persistent YouTube/Spotify host (owned by SongView) docks
+                  here while the modal is open, then returns to the mini-player. */}
+              <div
+                ref={youtubeSlotRef}
+                className="w-full overflow-hidden rounded-md"
               />
+              {song.mediaType === "youtube" && youtubeConfigured && (
+                <MediaTransport
+                  isPlaying={youtube.isPlaying}
+                  currentTime={youtube.currentTime}
+                  duration={youtube.duration}
+                  onToggle={youtube.toggle}
+                  onSeek={youtube.seek}
+                  disabled={!youtube.ready}
+                />
+              )}
+              {song.mediaType === "spotify" && (
+                <p className="text-xs text-muted-foreground">
+                  Spotify plays through its own embedded controls and keeps
+                  playing when this player is closed.
+                </p>
+              )}
             </div>
-          )}
-
-          {song.mediaType === "spotify" && spotifyEmbed && (
-            <iframe
-              title="Spotify player"
-              src={spotifyEmbed}
-              className="w-full rounded-md"
-              height={152}
-              frameBorder={0}
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-            />
           )}
 
           {song.mediaType === "none" && (
