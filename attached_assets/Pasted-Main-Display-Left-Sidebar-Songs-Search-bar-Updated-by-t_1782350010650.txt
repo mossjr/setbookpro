@@ -1,0 +1,83 @@
+Main Display
+Left Sidebar (Songs)
+Search bar (Updated by typing, highlight matching songs)
+Order and filter options
+List of Songs in Alphabetical order (Grouped by big letter)
+Below list of songs, Add New button, Multi Select Activate
+Side bar tabs (Songs, Sets, Tags, Settings)
+-  Multi Select
+- Checkbox beside songs
+- Select all option (to select all filtered songs)
+- Add to button to add to a Playlist/Set
+- Delete selected option
+- Share Selected Option
+- Additional options like invert selection, Select All, Clear Selection, Select by “Tag”
+- Left Sidebar (Sets)
+	- List of Sets (Title and Date created)
+	- Create new set
+	- Import/Export set (share a proprietary file, import the same proprietary file)
+- Import Export Sets
+	- Exports a proprietary format (really just JSON underneath)
+	- Exports both the set and all of the songs and details within the file
+- Import Export Songs
+	- Same thing as above but only for a song level
+
+Settings
+General
+Theme (Light/Dark, select Accent Colour)
+Option for chord display instrument (Guitar or Piano) Tapping chord shows the chord display (show display at top too
+Display Options (Auto/Scroll Songs/Split over pages)
+Personalisation
+Ability to personlise colour/size/font of Title, Artists, Meta, Lyrics, Chords, etc
+Backup and Sync
+Backup file automatically sent to Google Drive or retrieved by Google Drive (includes all songs, sets, settings, etc) Backups on a regular basis
+Chord Diagrams
+Ability to manage chord diagrams for Piano and for Guitar (map chord diagrams to common chords and add as required, scrape from Ultimate Guitar?
+
+Advance
+Metronome settings 
+Flash Bar on ticks toggle
+Enable Metronome Audio
+Auto Scroll Settings
+Default song duration (will scroll the song over that period of time, overwritten by song specific setting)
+Auto Scroll Delay (start scroll after a delay, define no of seconds)
+
+Main display when song is selected
+Displays title at top with artist and meta
+Menu button at top to reveal sidebar
+Quick actions button at top (Change Key, Transpose Plus/Menu, change auto scroll speed with slider, Lyrics mode only)
+Tags button to assign tags (create new tag if not present)
+Main song with chords (if lyrics only is off)
+Pinch to zoom, will flow according to settings
+Auto (if can fit whole song using multiple columns at zoom level, then do this, if not, then switched to scroll mode)
+Scroll Songs (Never uses multiple columns, only scrolling)
+Split Songs, will split into columns, overflow will be treated as a new page which tapping on lef or right of screen will advance or go previous (like an ebook)
+Live buttons (bottom right overlay)
+Zoom options (pressing this icon will reveal the Zoom Icons
+Plus button (Icon, zooms in a level)
+Minus button (Icon, Zooms out a level)
+Fit Button (Icon, fits the whole song on the page)
+Reset to default (resets to a default standard zoom level)
+Always retains most recent zoom that the user left on
+Go back to main live icons by clicking anywhere on the song
+Play Button (media Icon)
+Tapping will play the song (if song is assigned to tab)
+Tapping with no song applied will bring up the spotify search
+Selecting a song will assign that song to the play button
+Long pressing the play button will bring up the media player modal (name, album, artist, scrub bar, Play button, Trashcan to remove this song from the song association
+Metronome button
+Opens metronome, doctor beat style options
+Single tap opens metronome options if no options present
+Single tap plays/stops metronome metronome if options present
+Long press metronome opens metronome settings
+Scroll Button Scrub Bar (arrow down Icon) exists on a scrub bar across the bottom of the screen
+Tapping will start the scrolling (colour shows is scrolling active or not)
+Dragging the icon left or right will change the speed of the scroll
+Min speed and max speed can be edited person and aprox total scroll time should be indicated in the section
+ 
+
+Sets Tab will navigate a list of sets then songs are displayed in that set, tapping a song will display it in the main area
+
+Tags Tab will do the same as above but for tags
+
+Both of these tabs will have all the management settings needed add delete rename import export ect. 
