@@ -1,2 +1,3 @@
 - [SongBook architecture](songbook-architecture.md) — key decisions for UG API, Socket.io path, auth, and chord rendering
+- [rAF scroll sub-pixel accumulator](scroll-subpixel-accumulator.md) — slow auto-scroll stalls if you read scrollTop back each frame; use a float accumulator
 - [UG shared-playlist import](ug-playlist-import.md) — UG share links are Cloudflare-walled; need a JS-rendering scraper (Firecrawl) to read them server-side

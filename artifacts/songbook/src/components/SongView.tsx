@@ -9,6 +9,7 @@ import SettingsDialog from "./SettingsDialog";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 import { useSongViewLayout, EDGE } from "@/hooks/useSongViewLayout";
+import { usePinchZoom } from "@/hooks/usePinchZoom";
 import { resolveAudioUrl } from "@/lib/media";
 import { parseYouTubeId } from "@/lib/youtube";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,9 @@ export default function SongView({ songId }: { songId: string }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
+  // Live-scaled during a pinch gesture; reflows on release.
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+  const splitStageRef = useRef<HTMLDivElement>(null);
 
   const pressTimer = useRef<number | null>(null);
   const longPressed = useRef(false);
@@ -94,6 +98,17 @@ export default function SongView({ songId }: { songId: string }) {
 
   const isSplit = layout.effectiveMode === "split";
   const { pageIndex, pageCount, nextPage, prevPage } = layout;
+
+  // Pinch-to-zoom (touch): scale the content live, commit + reflow on release.
+  usePinchZoom({
+    frameRef,
+    enabled: !!song,
+    getStage: () => (isSplit ? splitStageRef.current : scrollContentRef.current),
+    getZoom: () => zoom,
+    setZoom,
+    min: 0.5,
+    max: 3,
+  });
 
   // Keyboard paging in split mode.
   useEffect(() => {
@@ -330,7 +345,10 @@ export default function SongView({ songId }: { songId: string }) {
       >
         {isSplit ? (
           <div className="absolute inset-0" style={{ padding: EDGE }}>
-            <div className="relative w-full h-full overflow-hidden">
+            <div
+              ref={splitStageRef}
+              className="relative w-full h-full overflow-hidden"
+            >
               <div
                 ref={pagerRef}
                 style={{
@@ -390,15 +408,17 @@ export default function SongView({ songId }: { songId: string }) {
             className="absolute inset-0 overflow-x-hidden overflow-y-auto"
             style={{ padding: EDGE }}
           >
-            <ChordRenderer
-              text={song.lyricsChords}
-              zoom={layout.effectiveZoom}
-              transpose={transpose}
-              lyricsOnly={lyricsOnly}
-              lyricsFontSize={lyricsFontSize}
-              chordsFontSize={chordsFontSize}
-              accentColor={accentColor}
-            />
+            <div ref={scrollContentRef}>
+              <ChordRenderer
+                text={song.lyricsChords}
+                zoom={layout.effectiveZoom}
+                transpose={transpose}
+                lyricsOnly={lyricsOnly}
+                lyricsFontSize={lyricsFontSize}
+                chordsFontSize={chordsFontSize}
+                accentColor={accentColor}
+              />
+            </div>
           </div>
         )}
       </div>

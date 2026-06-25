@@ -59,6 +59,11 @@ export default function ScrollScrubber({
 
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number>(0);
+  // Float accumulator for the scroll position. The browser rounds `scrollTop`
+  // to (sub)pixels, so at slow speeds the <1px per-frame delta would be lost if
+  // we read it back each frame — the scroll would stall. We keep the true
+  // position here and write it out, so even a 2px/s crawl advances smoothly.
+  const posRef = useRef<number | null>(null);
   const speedRef = useRef(currentSpeed);
   const delayTimerRef = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -79,6 +84,7 @@ export default function ScrollScrubber({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
     lastTsRef.current = 0;
+    posRef.current = null;
   }, []);
 
   const step = useCallback(
@@ -89,9 +95,13 @@ export default function ScrollScrubber({
         return;
       }
       if (!lastTsRef.current) lastTsRef.current = ts;
+      // Seed the accumulator from the live position (covers manual scrolling
+      // before/while starting), then advance it ourselves frame to frame.
+      if (posRef.current === null) posRef.current = el.scrollTop;
       const dt = (ts - lastTsRef.current) / 1000;
       lastTsRef.current = ts;
-      el.scrollTop += speedRef.current * dt;
+      posRef.current += speedRef.current * dt;
+      el.scrollTop = posRef.current;
       if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
         stop();
         return;
@@ -104,6 +114,7 @@ export default function ScrollScrubber({
   const begin = useCallback(() => {
     setIsScrolling(true);
     lastTsRef.current = 0;
+    posRef.current = null;
     rafRef.current = requestAnimationFrame(step);
   }, [step]);
 
