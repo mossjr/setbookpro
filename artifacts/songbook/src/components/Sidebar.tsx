@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { 
   useListSongs, getListSongsQueryKey,
   useListSets, getListSetsQueryKey,
@@ -8,14 +8,15 @@ import {
   useCreateSet
 } from "@workspace/api-client-react";
 import { useAppStore } from "@/store";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Music, ListMusic, Tags as TagsIcon, Search, Plus } from "lucide-react";
+import { Music, ListMusic, Tags as TagsIcon, Search, Plus, Download } from "lucide-react";
 
 export default function Sidebar() {
   const { selectedSongId, setSelectedSongId, setSidebarOpen } = useAppStore();
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("songs");
 
@@ -134,6 +135,20 @@ export default function Sidebar() {
             </div>
           )}
         </ScrollArea>
+      </div>
+
+      <div className="p-3 border-t border-sidebar-border shrink-0">
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2 text-primary border-primary/30 hover:bg-primary/10"
+          onClick={() => {
+            setSidebarOpen(false);
+            setLocation("/import");
+          }}
+        >
+          <Download className="w-4 h-4" />
+          Import from Ultimate Guitar
+        </Button>
       </div>
 
       {stats && (
