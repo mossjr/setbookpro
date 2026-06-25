@@ -22,11 +22,20 @@ interface TabSummary {
   votes: number;
 }
 
-function StarRating({ rating }: { rating: number }) {
+const TYPE_STYLES: Record<string, string> = {
+  Chords:      "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  Tab:         "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  "Pro Tab":   "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  Bass:        "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  Drums:       "bg-red-500/15 text-red-400 border-red-500/30",
+  Ukulele:     "bg-pink-500/15 text-pink-400 border-pink-500/30",
+};
+
+function TypeBadge({ type }: { type: string }) {
+  const cls = TYPE_STYLES[type] ?? "bg-muted text-muted-foreground border-border";
   return (
-    <span className="flex items-center gap-1 text-yellow-500 font-medium text-sm">
-      <Star className="w-3.5 h-3.5 fill-current" />
-      {rating > 0 ? rating.toFixed(1) : "—"}
+    <span className={`w-20 text-center inline-block text-xs font-semibold px-2 py-0.5 rounded border ${cls} truncate`}>
+      {type}
     </span>
   );
 }
@@ -195,33 +204,58 @@ export default function ImportPage() {
               {activeSearch ? "No results found." : "Loading popular tabs..."}
             </div>
           ) : (
-            results.map((tab) => (
-              <div
-                key={tab.id}
-                className="flex items-center justify-between p-4 bg-card rounded-lg border border-border gap-4"
-              >
-                <div className="min-w-0">
-                  <div className="font-bold leading-tight truncate">{tab.title}</div>
-                  <div className="text-sm text-muted-foreground truncate">{tab.artist}</div>
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <span className="text-xs bg-primary/15 text-primary px-2 py-0.5 rounded font-medium">
-                      {tab.type}
+            <div className="rounded-lg border border-border overflow-hidden">
+              {/* Header row */}
+              <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <span>Song / Artist</span>
+                <span className="w-20 text-center">Type</span>
+                <span className="w-16 text-right">Rating</span>
+                <span className="w-16" />
+              </div>
+
+              {results.map((tab, i) => (
+                <div
+                  key={tab.id}
+                  className={`grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 hover:bg-accent/50 transition-colors cursor-default ${
+                    i !== results.length - 1 ? "border-b border-border/60" : ""
+                  }`}
+                >
+                  {/* Title + artist */}
+                  <div className="min-w-0">
+                    <span className="font-semibold text-sm text-foreground truncate block leading-tight">
+                      {tab.title}
                     </span>
-                    <StarRating rating={tab.rating} />
-                    <span className="text-xs text-muted-foreground">{tab.votes} votes</span>
+                    <span className="text-xs text-muted-foreground truncate block">
+                      {tab.artist}
+                    </span>
+                  </div>
+
+                  {/* Type badge */}
+                  <TypeBadge type={tab.type} />
+
+                  {/* Rating */}
+                  <div className="w-16 flex items-center justify-end gap-1 text-yellow-500">
+                    <Star className="w-3.5 h-3.5 fill-current shrink-0" />
+                    <span className="text-xs font-semibold tabular-nums">
+                      {tab.rating > 0 ? tab.rating.toFixed(1) : "—"}
+                    </span>
+                  </div>
+
+                  {/* Action */}
+                  <div className="w-16 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                      onClick={() => setPreviewId(tab.id)}
+                    >
+                      <Download className="w-3.5 h-3.5 mr-1" />
+                      <span className="text-xs">Get</span>
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  onClick={() => setPreviewId(tab.id)}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Preview
-                </Button>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </ScrollArea>
