@@ -40,6 +40,10 @@ interface AppState {
   setToken: (token: string | null) => void;
   selectedSongId: string | null;
   setSelectedSongId: (id: string | null) => void;
+  activeSetId: string | null;
+  setActiveSetId: (id: string | null) => void;
+  lastPlayedSongId: string | null;
+  setLastPlayedSongId: (id: string | null) => void;
   displayMode: DisplayMode;
   setDisplayMode: (mode: DisplayMode) => void;
   lyricsOnly: boolean;
@@ -146,6 +150,10 @@ export const useAppStore = create<AppState>()(
       setToken: (token) => set({ token }),
       selectedSongId: null,
       setSelectedSongId: (selectedSongId) => set({ selectedSongId }),
+      activeSetId: null,
+      setActiveSetId: (activeSetId) => set({ activeSetId }),
+      lastPlayedSongId: null,
+      setLastPlayedSongId: (lastPlayedSongId) => set({ lastPlayedSongId }),
       displayMode: 'auto',
       setDisplayMode: (displayMode) => set({ displayMode }),
       lyricsOnly: false,
@@ -174,7 +182,9 @@ export const useAppStore = create<AppState>()(
         zoom: state.zoom, 
         displayMode: state.displayMode,
         lyricsOnly: state.lyricsOnly,
-        desktopSidebarOpen: state.desktopSidebarOpen
+        desktopSidebarOpen: state.desktopSidebarOpen,
+        activeSetId: state.activeSetId,
+        lastPlayedSongId: state.lastPlayedSongId
       }),
     }
   )

@@ -1,4 +1,4 @@
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { useGetSet, getGetSetQueryKey } from "@workspace/api-client-react";
 import { useAppStore } from "@/store";
 import { ArrowLeft, Play, Music } from "lucide-react";
@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 
 export default function SetView() {
   const [, params] = useRoute("/sets/:id");
+  const [, setLocation] = useLocation();
   const setId = params?.id || "";
-  const { setSelectedSongId } = useAppStore();
+  const { setSelectedSongId, setActiveSetId, setSidebarOpen } = useAppStore();
 
   const { data: set, isLoading } = useGetSet(setId, {
     query: { enabled: !!setId, queryKey: getGetSetQueryKey(setId) }
@@ -15,6 +16,13 @@ export default function SetView() {
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading set...</div>;
   if (!set) return <div className="p-8 text-center text-muted-foreground">Set not found</div>;
+
+  const startSong = (songId: string) => {
+    setActiveSetId(set.id);
+    setSelectedSongId(songId);
+    setSidebarOpen(false);
+    setLocation("/");
+  };
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
@@ -30,8 +38,8 @@ export default function SetView() {
             <p className="text-muted-foreground">{set.songs.length} songs</p>
           </div>
         </div>
-        <Button size="lg" className="rounded-full shadow-lg" onClick={() => {
-          if (set.songs.length > 0) setSelectedSongId(set.songs[0].id);
+        <Button size="lg" className="rounded-full shadow-lg" disabled={set.songs.length === 0} onClick={() => {
+          if (set.songs.length > 0) startSong(set.songs[0].id);
         }}>
           <Play className="w-5 h-5 mr-2 fill-current" /> Start Set
         </Button>
@@ -53,7 +61,7 @@ export default function SetView() {
               <div 
                 key={song.id} 
                 className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg shadow-sm hover:border-primary/50 transition-colors cursor-pointer"
-                onClick={() => setSelectedSongId(song.id)}
+                onClick={() => startSong(song.id)}
               >
                 <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-full text-muted-foreground font-bold shrink-0">
                   {i + 1}
@@ -62,7 +70,7 @@ export default function SetView() {
                   <h4 className="font-bold truncate text-foreground">{song.title}</h4>
                   <p className="text-sm text-muted-foreground truncate">{song.artist}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedSongId(song.id); }}>
+                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); startSong(song.id); }}>
                   <Play className="w-5 h-5 text-primary" />
                 </Button>
               </div>

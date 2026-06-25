@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   type Song,
@@ -7,6 +7,8 @@ import {
   getListSongsQueryKey,
   useListSets,
   getListSetsQueryKey,
+  useGetSet,
+  getGetSetQueryKey,
   useListTags,
   getListTagsQueryKey,
   useGetSongStats,
@@ -48,6 +50,7 @@ import {
   ListPlus,
   X,
   PanelLeftClose,
+  Star,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportLibrary, parseImportFile } from "@/lib/importExport";
@@ -55,8 +58,15 @@ import SongEditorDialog from "@/components/SongEditorDialog";
 import TagsManager from "@/components/TagsManager";
 
 export default function Sidebar() {
-  const { selectedSongId, setSelectedSongId, setSidebarOpen, setDesktopSidebarOpen } =
-    useAppStore();
+  const {
+    selectedSongId,
+    setSelectedSongId,
+    setSidebarOpen,
+    setDesktopSidebarOpen,
+    activeSetId,
+    setActiveSetId,
+    lastPlayedSongId,
+  } = useAppStore();
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -92,6 +102,26 @@ export default function Sidebar() {
   const createSong = useCreateSong();
   const createTag = useCreateTag();
   const addTagToSong = useAddTagToSong();
+
+  const { data: activeSet, isError: activeSetError } = useGetSet(
+    activeSetId ?? "",
+    {
+      query: {
+        enabled: !!activeSetId,
+        queryKey: getGetSetQueryKey(activeSetId ?? ""),
+      },
+    },
+  );
+
+  // Jump to the Songs tab when a set starts playing so its filtered list shows.
+  useEffect(() => {
+    if (activeSetId) setActiveTab("songs");
+  }, [activeSetId]);
+
+  // If the active set no longer exists, drop out of set mode.
+  useEffect(() => {
+    if (activeSetId && activeSetError) setActiveSetId(null);
+  }, [activeSetId, activeSetError, setActiveSetId]);
 
   const grouped = useMemo(() => {
     const sorted = [...songs].sort((a, b) =>
@@ -133,6 +163,7 @@ export default function Sidebar() {
     }
     setSelectedSongId(id);
     setSidebarOpen(false);
+    setLocation("/");
   };
 
   const toggleSelected = (id: string) =>
@@ -310,7 +341,7 @@ export default function Sidebar() {
 
       <div className="flex-1 overflow-hidden relative">
         <ScrollArea className="h-full">
-          {activeTab === "songs" && (
+          {activeTab === "songs" && !activeSetId && (
             <div className="p-4 space-y-3">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
@@ -454,7 +485,7 @@ export default function Sidebar() {
                                 selectedSongId === song.id && !selectMode
                                   ? "bg-primary/20"
                                   : "hover:bg-sidebar-accent"
-                              }`}
+                              } ${lastPlayedSongId === song.id ? "ring-1 ring-primary/60" : ""}`}
                             >
                               {selectMode && (
                                 <button
@@ -496,6 +527,9 @@ export default function Sidebar() {
                                   </div>
                                 )}
                               </button>
+                              {lastPlayedSongId === song.id && (
+                                <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                              )}
                               {!selectMode && (
                                 <div className="flex shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
                                   <Button
@@ -524,6 +558,78 @@ export default function Sidebar() {
                   ))
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === "songs" && activeSetId && (
+            <div className="p-4 space-y-3">
+              {!activeSet ? (
+                <div className="text-center p-4 text-muted-foreground">
+                  Loading set...
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 rounded-md bg-primary/10 border border-primary/30 p-2.5">
+                    <ListMusic className="w-4 h-4 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] uppercase tracking-wide text-primary font-semibold">
+                        Playing set
+                      </div>
+                      <div className="font-semibold truncate text-foreground">
+                        {activeSet.title}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-muted-foreground"
+                      onClick={() => setActiveSetId(null)}
+                      title="Exit set"
+                    >
+                      <X className="w-4 h-4 mr-1" /> Exit
+                    </Button>
+                  </div>
+
+                  {activeSet.songs.length === 0 ? (
+                    <div className="text-center p-4 text-muted-foreground text-sm">
+                      This set has no songs.
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {activeSet.songs.map((song, i) => {
+                        const isCurrent = selectedSongId === song.id;
+                        const isLast = lastPlayedSongId === song.id;
+                        return (
+                          <button
+                            key={song.id}
+                            onClick={() => handleSelectSong(song.id)}
+                            className={`group flex items-center gap-3 w-full text-left rounded-md p-2.5 transition-colors ${
+                              isCurrent
+                                ? "bg-primary/20"
+                                : "hover:bg-sidebar-accent"
+                            } ${isLast ? "ring-1 ring-primary/60" : ""}`}
+                          >
+                            <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full text-xs font-bold text-muted-foreground shrink-0">
+                              {i + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-foreground truncate">
+                                {song.title}
+                              </div>
+                              <div className="text-sm text-muted-foreground truncate">
+                                {song.artist}
+                              </div>
+                            </div>
+                            {isLast && (
+                              <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { useGetSong, getGetSongQueryKey } from "@workspace/api-client-react";
+import {
+  useGetSong,
+  getGetSongQueryKey,
+  useGetSet,
+  getGetSetQueryKey,
+} from "@workspace/api-client-react";
 import { useAppStore, useSettingsStore } from "@/store";
 import ChordRenderer from "./ChordRenderer";
 import Metronome from "./Metronome";
@@ -27,6 +32,9 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  SkipBack,
+  SkipForward,
+  Star,
 } from "lucide-react";
 
 // Horizontal safe zones so song content never renders under floating overlays.
@@ -51,10 +59,23 @@ export default function SongView({ songId }: { songId: string }) {
     setSidebarOpen,
     desktopSidebarOpen,
     setDesktopSidebarOpen,
+    activeSetId,
+    setSelectedSongId,
+    lastPlayedSongId,
+    setLastPlayedSongId,
   } = useAppStore();
 
   const { titleFontSize, lyricsFontSize, chordsFontSize, accentColor } =
     useSettingsStore();
+
+  // Active set (for in-header Prev/Next navigation). Called before any early
+  // return to keep hook order stable; shares cache with the Sidebar via key.
+  const { data: activeSet } = useGetSet(activeSetId ?? "", {
+    query: {
+      enabled: !!activeSetId,
+      queryKey: getGetSetQueryKey(activeSetId ?? ""),
+    },
+  });
 
   const [transpose, setTranspose] = useState(0);
   const [mediaOpen, setMediaOpen] = useState(false);
@@ -219,6 +240,30 @@ export default function SongView({ songId }: { songId: string }) {
 
   const hasMedia = song.mediaType === "audio" || song.mediaType === "youtube";
 
+  // Set navigation: move through the active set in order.
+  const setSongs = activeSet?.songs ?? [];
+  const inActiveSet = !!activeSetId && setSongs.length > 0;
+  const setIndex = inActiveSet
+    ? setSongs.findIndex((s) => s.id === song.id)
+    : -1;
+  const canPrev = setIndex > 0;
+  const canNext =
+    inActiveSet && (setIndex < 0 || setIndex < setSongs.length - 1);
+  const goPrev = () => {
+    if (canPrev) setSelectedSongId(setSongs[setIndex - 1].id);
+  };
+  const goNext = () => {
+    if (!inActiveSet) return;
+    if (setIndex < 0) setSelectedSongId(setSongs[0].id);
+    else if (setIndex < setSongs.length - 1)
+      setSelectedSongId(setSongs[setIndex + 1].id);
+  };
+
+  // "Last Played" bookmark: marks a single song so it's easy to return to.
+  const isBookmarked = lastPlayedSongId === song.id;
+  const toggleBookmark = () =>
+    setLastPlayedSongId(isBookmarked ? null : song.id);
+
   const cycleMode = () =>
     setDisplayMode(
       displayMode === "scroll"
@@ -279,6 +324,32 @@ export default function SongView({ songId }: { songId: string }) {
           >
             <Menu className="w-5 h-5" />
           </Button>
+          {inActiveSet && (
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={goPrev}
+                disabled={!canPrev}
+                title="Previous song"
+                aria-label="Previous song"
+              >
+                <SkipBack className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={goNext}
+                disabled={!canNext}
+                title="Next song"
+                aria-label="Next song"
+              >
+                <SkipForward className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
           <div className="flex flex-col max-w-[160px] sm:max-w-xs md:max-w-md">
             <h1
               className="font-bold truncate text-foreground leading-tight"
@@ -333,6 +404,18 @@ export default function SongView({ songId }: { songId: string }) {
           >
             <Eye
               className={`w-5 h-5 ${lyricsOnly ? "text-primary" : "text-muted-foreground"}`}
+            />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleBookmark}
+            title={isBookmarked ? "Clear Last Played" : "Mark as Last Played"}
+            aria-label="Last Played"
+          >
+            <Star
+              className={`w-5 h-5 ${isBookmarked ? "text-primary fill-primary" : "text-muted-foreground"}`}
             />
           </Button>
 
