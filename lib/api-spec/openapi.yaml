@@ -552,6 +552,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/Song"
 
+  /media/search/youtube:
+    get:
+      operationId: searchYoutube
+      tags: [media]
+      summary: Search YouTube for videos to attach to a song
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaSearchResults"
+
+  /media/search/spotify:
+    get:
+      operationId: searchSpotify
+      tags: [media]
+      summary: Search Spotify for tracks to attach to a song
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaSearchResults"
+        "503":
+          description: Spotify search is not configured on the server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /storage/uploads/request-url:
     post:
       tags: [Storage]
@@ -927,6 +971,32 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UgTabSummary"
+
+    MediaSearchItem:
+      type: object
+      required: [id, url, title]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: ["string", "null"]
+        thumbnail:
+          type: ["string", "null"]
+        durationLabel:
+          type: ["string", "null"]
+
+    MediaSearchResults:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaSearchItem"
 
     UgTab:
       type: object

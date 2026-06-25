@@ -26,6 +26,9 @@ import type {
   LibraryStats,
   ListSongsParams,
   LoginInput,
+  MediaSearchResults,
+  SearchSpotifyParams,
+  SearchYoutubeParams,
   SetReorder,
   SetSongAdd,
   Song,
@@ -2131,6 +2134,174 @@ export const useUgImportTab = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUgImportTabMutationOptions(options));
     }
+
+export const getSearchYoutubeUrl = (params: SearchYoutubeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/media/search/youtube?${stringifiedParams}` : `/api/media/search/youtube`
+}
+
+/**
+ * @summary Search YouTube for videos to attach to a song
+ */
+export const searchYoutube = async (params: SearchYoutubeParams, options?: RequestInit): Promise<MediaSearchResults> => {
+
+  return customFetch<MediaSearchResults>(getSearchYoutubeUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchYoutubeQueryKey = (params?: SearchYoutubeParams,) => {
+    return [
+    `/api/media/search/youtube`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchYoutubeQueryOptions = <TData = Awaited<ReturnType<typeof searchYoutube>>, TError = ErrorType<unknown>>(params: SearchYoutubeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchYoutube>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchYoutubeQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchYoutube>>> = ({ signal }) => searchYoutube(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchYoutube>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchYoutubeQueryResult = NonNullable<Awaited<ReturnType<typeof searchYoutube>>>
+export type SearchYoutubeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search YouTube for videos to attach to a song
+ */
+
+export function useSearchYoutube<TData = Awaited<ReturnType<typeof searchYoutube>>, TError = ErrorType<unknown>>(
+ params: SearchYoutubeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchYoutube>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchYoutubeQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSearchSpotifyUrl = (params: SearchSpotifyParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/media/search/spotify?${stringifiedParams}` : `/api/media/search/spotify`
+}
+
+/**
+ * @summary Search Spotify for tracks to attach to a song
+ */
+export const searchSpotify = async (params: SearchSpotifyParams, options?: RequestInit): Promise<MediaSearchResults> => {
+
+  return customFetch<MediaSearchResults>(getSearchSpotifyUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchSpotifyQueryKey = (params?: SearchSpotifyParams,) => {
+    return [
+    `/api/media/search/spotify`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchSpotifyQueryOptions = <TData = Awaited<ReturnType<typeof searchSpotify>>, TError = ErrorType<ErrorEnvelope>>(params: SearchSpotifyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchSpotify>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchSpotifyQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchSpotify>>> = ({ signal }) => searchSpotify(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchSpotify>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchSpotifyQueryResult = NonNullable<Awaited<ReturnType<typeof searchSpotify>>>
+export type SearchSpotifyQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Search Spotify for tracks to attach to a song
+ */
+
+export function useSearchSpotify<TData = Awaited<ReturnType<typeof searchSpotify>>, TError = ErrorType<ErrorEnvelope>>(
+ params: SearchSpotifyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchSpotify>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchSpotifyQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getRequestUploadUrlUrl = () => {
 

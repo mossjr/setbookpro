@@ -220,6 +220,22 @@ export interface UgSearchResults {
   tabs: UgTabSummary[];
 }
 
+export interface MediaSearchItem {
+  id: string;
+  url: string;
+  title: string;
+  /** @nullable */
+  subtitle?: string | null;
+  /** @nullable */
+  thumbnail?: string | null;
+  /** @nullable */
+  durationLabel?: string | null;
+}
+
+export interface MediaSearchResults {
+  results: MediaSearchItem[];
+}
+
 export interface UgTab {
   id: string;
   title: string;
@@ -247,5 +263,13 @@ tagId?: string;
 
 export type UgSearchParams = {
 title: string;
+};
+
+export type SearchYoutubeParams = {
+q: string;
+};
+
+export type SearchSpotifyParams = {
+q: string;
 };
 

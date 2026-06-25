@@ -524,6 +524,44 @@ export const UgImportTabBody = zod.object({
 
 
 /**
+ * @summary Search YouTube for videos to attach to a song
+ */
+export const SearchYoutubeQueryParams = zod.object({
+  "q": zod.coerce.string()
+})
+
+export const SearchYoutubeResponse = zod.object({
+  "results": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullish(),
+  "thumbnail": zod.string().nullish(),
+  "durationLabel": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Search Spotify for tracks to attach to a song
+ */
+export const SearchSpotifyQueryParams = zod.object({
+  "q": zod.coerce.string()
+})
+
+export const SearchSpotifyResponse = zod.object({
+  "results": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullish(),
+  "thumbnail": zod.string().nullish(),
+  "durationLabel": zod.string().nullish()
+}))
+})
+
+
+/**
  * Returns a presigned GCS URL for direct upload. The client sends JSON
 metadata here, then uploads the file directly to the returned URL.
 

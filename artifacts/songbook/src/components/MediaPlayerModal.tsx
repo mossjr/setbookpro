@@ -1,8 +1,13 @@
 import { useRef, useState, useEffect } from "react";
 import {
   type Song,
+  type MediaSearchItem,
   SongUpdateMediaType,
   useUpdateSong,
+  useSearchYoutube,
+  getSearchYoutubeQueryKey,
+  useSearchSpotify,
+  getSearchSpotifyQueryKey,
   getGetSongQueryKey,
   getListSongsQueryKey,
 } from "@workspace/api-client-react";
@@ -33,6 +38,7 @@ import {
   Youtube,
   Music2,
   Loader2,
+  Search,
 } from "lucide-react";
 
 interface MediaPlayerModalProps {
@@ -91,6 +97,82 @@ function MediaTransport({
   );
 }
 
+function SearchResults({
+  items,
+  isFetching,
+  isError,
+  notConfigured,
+  emptyHint,
+  onPick,
+}: {
+  items: MediaSearchItem[];
+  isFetching: boolean;
+  isError: boolean;
+  notConfigured?: boolean;
+  emptyHint: string;
+  onPick: (item: MediaSearchItem) => void;
+}) {
+  if (notConfigured) {
+    return (
+      <p className="text-xs text-muted-foreground py-3 text-center">
+        Spotify search isn’t set up on the server yet.
+      </p>
+    );
+  }
+  if (isFetching) {
+    return (
+      <div className="flex items-center justify-center py-6 text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <p className="text-xs text-destructive py-3 text-center">
+        Search failed. Try again.
+      </p>
+    );
+  }
+  if (!items.length) {
+    return (
+      <p className="text-xs text-muted-foreground py-3 text-center">
+        {emptyHint}
+      </p>
+    );
+  }
+  return (
+    <div className="max-h-60 overflow-y-auto rounded-md border border-border divide-y divide-border/60">
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onPick(item)}
+          className="flex items-center gap-3 w-full p-2 text-left hover:bg-accent/50 transition-colors"
+        >
+          {item.thumbnail ? (
+            <img
+              src={item.thumbnail}
+              alt=""
+              loading="lazy"
+              className="w-12 h-12 rounded object-cover shrink-0 bg-muted"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded bg-muted shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium truncate">{item.title}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {item.subtitle}
+              {item.subtitle && item.durationLabel ? " · " : ""}
+              {item.durationLabel}
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function MediaPlayerModal({
   song,
   audio,
@@ -105,10 +187,31 @@ export default function MediaPlayerModal({
   const [spotifyInput, setSpotifyInput] = useState(song.spotifyLink ?? "");
   const [youtubeInput, setYoutubeInput] = useState(song.youtubeUrl ?? "");
 
+  const initialTerm = [song.title, song.artist]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const [spTerm, setSpTerm] = useState(initialTerm);
+  const [spQuery, setSpQuery] = useState(initialTerm);
+  const [spSearchOpen, setSpSearchOpen] = useState(false);
+  const [ytTerm, setYtTerm] = useState(initialTerm);
+  const [ytQuery, setYtQuery] = useState(initialTerm);
+  const [ytSearchOpen, setYtSearchOpen] = useState(false);
+
   useEffect(() => {
     setSpotifyInput(song.spotifyLink ?? "");
     setYoutubeInput(song.youtubeUrl ?? "");
   }, [song.spotifyLink, song.youtubeUrl]);
+
+  useEffect(() => {
+    const term = [song.title, song.artist].filter(Boolean).join(" ").trim();
+    setSpTerm(term);
+    setSpQuery(term);
+    setSpSearchOpen(false);
+    setYtTerm(term);
+    setYtQuery(term);
+    setYtSearchOpen(false);
+  }, [song.id, song.title, song.artist]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ytWrapperRef = useRef<HTMLDivElement>(null);
@@ -127,6 +230,30 @@ export default function MediaPlayerModal({
     ytWrapperRef,
     open && song.mediaType === "youtube" ? youtubeVideoId : null,
   );
+
+  const spotifySearch = useSearchSpotify(
+    { q: spQuery },
+    {
+      query: {
+        enabled: open && spSearchOpen && spQuery.trim().length > 0,
+        queryKey: getSearchSpotifyQueryKey({ q: spQuery }),
+        staleTime: 5 * 60 * 1000,
+        retry: false,
+      },
+    },
+  );
+  const youtubeSearch = useSearchYoutube(
+    { q: ytQuery },
+    {
+      query: {
+        enabled: open && ytSearchOpen && ytQuery.trim().length > 0,
+        queryKey: getSearchYoutubeQueryKey({ q: ytQuery }),
+        staleTime: 5 * 60 * 1000,
+        retry: false,
+      },
+    },
+  );
+  const spotifyNotConfigured = spotifySearch.error?.status === 503;
 
   const persist = (data: Parameters<typeof updateMutation.mutate>[0]["data"]) => {
     updateMutation.mutate(
@@ -212,6 +339,43 @@ export default function MediaPlayerModal({
       mediaType: song.mediaType === "youtube" ? "none" : song.mediaType,
       youtubeUrl: null,
     });
+
+  const runSpotifySearch = () => {
+    const term = spTerm.trim();
+    if (!term) return;
+    setSpQuery(term);
+    setSpSearchOpen(true);
+  };
+
+  const runYoutubeSearch = () => {
+    const term = ytTerm.trim();
+    if (!term) return;
+    setYtQuery(term);
+    setYtSearchOpen(true);
+  };
+
+  const pickSpotify = (item: MediaSearchItem) => {
+    if (!parseSpotifyEmbedUrl(item.url)) {
+      toast({
+        title: "Couldn't use that Spotify result",
+        variant: "destructive",
+      });
+      return;
+    }
+    audio.pause();
+    setSpotifyInput(item.url);
+    persist({ mediaType: "spotify", spotifyLink: item.url });
+    setSpSearchOpen(false);
+    toast({ title: `Spotify set: ${item.title}` });
+  };
+
+  const pickYoutube = (item: MediaSearchItem) => {
+    audio.pause();
+    setYoutubeInput(item.url);
+    persist({ mediaType: "youtube", youtubeUrl: item.url });
+    setYtSearchOpen(false);
+    toast({ title: `YouTube set: ${item.title}` });
+  };
 
   const sourceButtons: {
     type: SongUpdateMediaType;
@@ -384,15 +548,49 @@ export default function MediaPlayerModal({
           {/* Spotify */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <Music2 className="w-4 h-4" /> Spotify link
+              <Music2 className="w-4 h-4" /> Spotify
             </Label>
             <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search Spotify…"
+                  value={spTerm}
+                  onChange={(e) => setSpTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      runSpotifySearch();
+                    }
+                  }}
+                />
+              </div>
+              <Button onClick={runSpotifySearch} disabled={!spTerm.trim()}>
+                Search
+              </Button>
+            </div>
+            {spSearchOpen && (
+              <SearchResults
+                items={spotifySearch.data?.results ?? []}
+                isFetching={spotifySearch.isFetching}
+                isError={!!spotifySearch.error && !spotifyNotConfigured}
+                notConfigured={spotifyNotConfigured}
+                emptyHint="No tracks found."
+                onPick={pickSpotify}
+              />
+            )}
+            <div className="flex gap-2">
               <Input
-                placeholder="https://open.spotify.com/track/..."
+                placeholder="or paste a Spotify link"
                 value={spotifyInput}
                 onChange={(e) => setSpotifyInput(e.target.value)}
               />
-              <Button onClick={saveSpotify} disabled={!spotifyInput.trim()}>
+              <Button
+                variant="secondary"
+                onClick={saveSpotify}
+                disabled={!spotifyInput.trim()}
+              >
                 Save
               </Button>
               {spotifyConfigured && (
@@ -406,15 +604,48 @@ export default function MediaPlayerModal({
           {/* YouTube */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <Youtube className="w-4 h-4" /> YouTube link
+              <Youtube className="w-4 h-4" /> YouTube
             </Label>
             <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search YouTube…"
+                  value={ytTerm}
+                  onChange={(e) => setYtTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      runYoutubeSearch();
+                    }
+                  }}
+                />
+              </div>
+              <Button onClick={runYoutubeSearch} disabled={!ytTerm.trim()}>
+                Search
+              </Button>
+            </div>
+            {ytSearchOpen && (
+              <SearchResults
+                items={youtubeSearch.data?.results ?? []}
+                isFetching={youtubeSearch.isFetching}
+                isError={!!youtubeSearch.error}
+                emptyHint="No videos found."
+                onPick={pickYoutube}
+              />
+            )}
+            <div className="flex gap-2">
               <Input
-                placeholder="https://youtube.com/watch?v=..."
+                placeholder="or paste a YouTube link"
                 value={youtubeInput}
                 onChange={(e) => setYoutubeInput(e.target.value)}
               />
-              <Button onClick={saveYoutube} disabled={!youtubeInput.trim()}>
+              <Button
+                variant="secondary"
+                onClick={saveYoutube}
+                disabled={!youtubeInput.trim()}
+              >
                 Save
               </Button>
               {youtubeConfigured && (
