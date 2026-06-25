@@ -81,15 +81,15 @@ export default function ChordRenderer({
           const label = parseSectionLabel(line);
           if (label) {
             return (
-              <div key={i} className="font-bold text-primary/80 mt-6 mb-1" style={{ fontSize: lyricsSize * 0.85 }}>
+              <div key={i} className="font-bold text-primary/80 mt-6 mb-1" style={{ fontSize: lyricsSize * 0.85, overflowWrap: "anywhere", breakInside: "avoid" }}>
                 {label}
               </div>
             );
           }
           const lyric = line.replace(/\[([A-G][^\]]*)\]/g, "");
-          if (!lyric.trim()) return <div key={i} style={{ height: lyricsSize * 0.5 }} />;
+          if (!lyric.trim()) return <div key={i} style={{ height: lyricsSize * 0.5, breakInside: "avoid" }} />;
           return (
-            <div key={i} style={{ whiteSpace: "pre-wrap" }}>
+            <div key={i} style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", breakInside: "avoid" }}>
               {lyric}
             </div>
           );
@@ -104,14 +104,14 @@ export default function ChordRenderer({
       {lines.map((line, i) => {
         // Blank line → small gap
         if (!line.trim()) {
-          return <div key={i} style={{ height: lyricsSize * 0.75 }} />;
+          return <div key={i} style={{ height: lyricsSize * 0.75, breakInside: "avoid" }} />;
         }
 
         // Section header → styled label
         const label = parseSectionLabel(line);
         if (label) {
           return (
-            <div key={i} className="font-bold text-primary/80 mt-6 mb-1" style={{ fontSize: lyricsSize * 0.85 }}>
+            <div key={i} className="font-bold text-primary/80 mt-6 mb-1" style={{ fontSize: lyricsSize * 0.85, breakInside: "avoid" }}>
               {label}
             </div>
           );
@@ -123,7 +123,7 @@ export default function ChordRenderer({
         // Pure lyric line — no chord row needed at all
         if (!lineHasChords) {
           return (
-            <div key={i} style={{ whiteSpace: "pre", lineHeight: 1.65, fontSize: lyricsSize, marginBottom: 2 }}>
+            <div key={i} style={{ whiteSpace: "pre", lineHeight: 1.65, fontSize: lyricsSize, marginBottom: 2, breakInside: "avoid" }}>
               {segments[0]?.lyric ?? ""}
             </div>
           );
@@ -134,7 +134,7 @@ export default function ChordRenderer({
         // This is critical for chord-only lines (intro riffs, etc.) where
         // the lyric slot is empty — the segment width is set by the chord.
         return (
-          <div key={i} style={{ marginBottom: 4, lineHeight: 1 }}>
+          <div key={i} style={{ marginBottom: 4, lineHeight: 1, breakInside: "avoid" }}>
             {segments.map((seg, j) => {
               // Lyric text for this segment. For a chord-only segment,
               // use a non-breaking space so the segment has non-zero height

@@ -8,7 +8,7 @@ import BottomScrollScrubber from "./BottomScrollScrubber";
 import SettingsDialog from "./SettingsDialog";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
-import { useAutoFitLayout } from "@/hooks/useAutoFitLayout";
+import { useSongViewLayout, EDGE } from "@/hooks/useSongViewLayout";
 import { resolveAudioUrl } from "@/lib/media";
 import { parseYouTubeId } from "@/lib/youtube";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,15 @@ import {
   Menu,
   Columns,
   AlignLeft,
+  Wand2,
   Minus,
   Plus,
   Play,
   Pause,
   Music,
   Eye,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export default function SongView({ songId }: { songId: string }) {
@@ -45,6 +48,8 @@ export default function SongView({ songId }: { songId: string }) {
   const [transpose, setTranspose] = useState(0);
   const [mediaOpen, setMediaOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const pagerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
 
   const pressTimer = useRef<number | null>(null);
@@ -73,16 +78,31 @@ export default function SongView({ songId }: { songId: string }) {
   const ytWrapperRef = useRef<HTMLDivElement>(null);
   const yt = useYouTubePlayer(ytWrapperRef, youtubeVideoId);
 
-  // 'auto' is the intelligent multi-column fit; legacy 'columns' maps onto it.
-  const layoutMode = displayMode === "columns" ? "auto" : displayMode;
-  const auto = useAutoFitLayout({
-    enabled: layoutMode === "auto",
-    scrollRef,
-    measureRef,
+  // Layout hook is called BEFORE any early return to keep hook order stable.
+  const layout = useSongViewLayout({
+    displayMode,
+    userZoom: zoom,
     lyricsOnly,
-    recomputeKey: `${song?.id ?? ""}|${transpose}|${lyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}`,
+    lyricsFontSize,
+    frameRef,
+    pagerRef,
+    measureRef,
+    recomputeKey: `${song?.id ?? ""}|${transpose}|${lyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}|${zoom}|${displayMode}`,
   });
-  const effectiveZoom = layoutMode === "auto" ? auto.zoom : zoom;
+
+  const isSplit = layout.effectiveMode === "split";
+  const { pageIndex, pageCount, nextPage, prevPage } = layout;
+
+  // Keyboard paging in split mode.
+  useEffect(() => {
+    if (!isSplit) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") nextPage();
+      else if (e.key === "ArrowLeft") prevPage();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isSplit, nextPage, prevPage]);
 
   if (isLoading)
     return (
@@ -162,48 +182,54 @@ export default function SongView({ songId }: { songId: string }) {
     }
   };
 
-  const hasMedia =
-    song.mediaType === "audio" || song.mediaType === "youtube";
+  const hasMedia = song.mediaType === "audio" || song.mediaType === "youtube";
 
-  // Zoom out until the whole song fits inside the scroll viewport. Content
-  // height scales with zoom (font sizes), but fixed margins (section labels,
-  // padding) make it non-linear, so we estimate then refine over a couple of
-  // animation frames until it actually fits.
+  const cycleMode = () =>
+    setDisplayMode(
+      displayMode === "scroll"
+        ? "split"
+        : displayMode === "split"
+          ? "auto"
+          : "scroll",
+    );
+
+  const modeIcon =
+    displayMode === "scroll" ? (
+      <AlignLeft className="w-5 h-5" />
+    ) : displayMode === "split" ? (
+      <Columns className="w-5 h-5" />
+    ) : (
+      <Wand2 className="w-5 h-5" />
+    );
+
+  const zoomIn = () => setZoom(Math.min(3, Math.round((zoom + 0.1) * 100) / 100));
+  const zoomOut = () =>
+    setZoom(Math.max(0.5, Math.round((zoom - 0.1) * 100) / 100));
+
+  // Zoom out until the whole song fits vertically (scroll mode only). Content
+  // height scales with zoom, but fixed margins make it non-linear, so we
+  // estimate then refine over a couple of frames until it actually fits.
   const fitToScreen = () => {
     const run = (passesLeft: number) => {
       const node = scrollRef.current;
       if (!node) return;
-      const cs = getComputedStyle(node);
-      const padY =
-        parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-      const padX =
-        parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      const availH = node.clientHeight - padY;
-      const availW = node.clientWidth - padX;
-      const contentH = node.scrollHeight - padY;
-      const contentW = node.scrollWidth - padX;
-      if (availH <= 0 || contentH <= 0 || availW <= 0 || contentW <= 0)
-        return;
+      const availH = node.clientHeight - 2 * EDGE;
+      const contentH = node.scrollHeight - 2 * EDGE;
+      if (availH <= 0 || contentH <= 0) return;
+      if (contentH <= availH + 1) return; // already fits
 
-      // Already fully visible (small tolerance for sub-pixel rounding).
-      if (contentH <= availH + 1 && contentW <= availW + 1) return;
-
-      const current = useAppStore.getState().zoom;
-      const ratio = Math.min(availH / contentH, availW / contentW);
+      const current = layout.effectiveZoom;
+      const ratio = availH / contentH;
       if (!Number.isFinite(ratio) || ratio <= 0) return;
-      // Round down so a slight under-estimate doesn't re-overflow.
-      const next = Math.max(
-        0.5,
-        Math.min(3, Math.floor(current * ratio * 100) / 100),
-      );
-      if (next >= current) return; // can't shrink further (at min zoom)
-
+      const next = Math.max(0.5, Math.floor(current * ratio * 100) / 100);
+      if (next >= current) return; // at min zoom
       setZoom(next);
-      if (passesLeft > 0)
-        requestAnimationFrame(() => run(passesLeft - 1));
+      if (passesLeft > 0) requestAnimationFrame(() => run(passesLeft - 1));
     };
     run(3);
   };
+
+  const translate = -pageIndex * layout.pageWidth;
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
@@ -258,20 +284,10 @@ export default function SongView({ songId }: { songId: string }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() =>
-              setDisplayMode(layoutMode === "auto" ? "scroll" : "auto")
-            }
-            title={
-              layoutMode === "auto"
-                ? "Auto-fit columns (tap for scroll)"
-                : "Scroll (tap for auto-fit)"
-            }
+            onClick={cycleMode}
+            title={`Layout: ${displayMode} (tap to change)`}
           >
-            {layoutMode === "auto" ? (
-              <Columns className="w-5 h-5" />
-            ) : (
-              <AlignLeft className="w-5 h-5" />
-            )}
+            {modeIcon}
           </Button>
 
           <Button
@@ -289,34 +305,87 @@ export default function SongView({ songId }: { songId: string }) {
         </div>
       </header>
 
-      {/* Song Body */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-auto p-4 md:p-8"
-        style={
-          layoutMode === "auto"
-            ? {
-                columnCount: auto.columnCount,
-                columnGap: "2rem",
-                columnFill: "balance",
-              }
-            : undefined
-        }
-      >
-        <ChordRenderer
-          text={song.lyricsChords}
-          zoom={effectiveZoom}
-          transpose={transpose}
-          lyricsOnly={lyricsOnly}
-          lyricsFontSize={lyricsFontSize}
-          chordsFontSize={chordsFontSize}
-          accentColor={accentColor}
-        />
+      {/* Song Body — a stable measured frame that hosts either the scroll
+          viewport or the paginated split pager. */}
+      <div ref={frameRef} className="flex-1 relative overflow-hidden">
+        {isSplit ? (
+          <div className="absolute inset-0" style={{ padding: EDGE }}>
+            <div className="relative w-full h-full overflow-hidden">
+              <div
+                ref={pagerRef}
+                style={{
+                  height: "100%",
+                  columnWidth: `${layout.columnWidth}px`,
+                  columnGap: `${layout.columnGap}px`,
+                  columnFill: "auto",
+                  transform: `translateX(${translate}px)`,
+                  transition: "transform 220ms ease",
+                  willChange: "transform",
+                }}
+              >
+                <ChordRenderer
+                  text={song.lyricsChords}
+                  zoom={layout.effectiveZoom}
+                  transpose={transpose}
+                  lyricsOnly={lyricsOnly}
+                  lyricsFontSize={lyricsFontSize}
+                  chordsFontSize={chordsFontSize}
+                  accentColor={accentColor}
+                />
+              </div>
+
+              {/* Page-turn tap zones (left = prev, right = next). */}
+              <button
+                type="button"
+                aria-label="Previous page"
+                onClick={prevPage}
+                className="absolute inset-y-0 left-0 w-1/2 cursor-w-resize disabled:cursor-default"
+                disabled={pageIndex <= 0}
+              />
+              <button
+                type="button"
+                aria-label="Next page"
+                onClick={nextPage}
+                className="absolute inset-y-0 right-0 w-1/2 cursor-e-resize disabled:cursor-default"
+                disabled={pageIndex >= pageCount - 1}
+              />
+
+              {/* Page indicator */}
+              {pageCount > 1 && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full bg-card/90 border border-border px-3 py-1 text-xs font-medium shadow-sm pointer-events-none">
+                  <ChevronLeft
+                    className={`w-3.5 h-3.5 ${pageIndex <= 0 ? "opacity-30" : ""}`}
+                  />
+                  {pageIndex + 1} / {pageCount}
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 ${pageIndex >= pageCount - 1 ? "opacity-30" : ""}`}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div
+            ref={scrollRef}
+            className="absolute inset-0 overflow-x-hidden overflow-y-auto"
+            style={{ padding: EDGE }}
+          >
+            <ChordRenderer
+              text={song.lyricsChords}
+              zoom={layout.effectiveZoom}
+              transpose={transpose}
+              lyricsOnly={lyricsOnly}
+              lyricsFontSize={lyricsFontSize}
+              chordsFontSize={chordsFontSize}
+              accentColor={accentColor}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Hidden measurer: a zoom-1 mirror of the song used purely to compute the
-          optimal column count + zoom for auto-fit. Never shown to the user. */}
-      {layoutMode === "auto" && (
+      {/* Hidden measurer: a zoom-1 mirror of the song used purely to measure the
+          widest chord line for the width-safe zoom clamp. Never shown. */}
+      {!lyricsOnly && (
         <div
           ref={measureRef}
           aria-hidden
@@ -324,9 +393,11 @@ export default function SongView({ songId }: { songId: string }) {
           style={{
             position: "absolute",
             visibility: "hidden",
+            display: "inline-block",
             left: -99999,
             top: 0,
             zIndex: -1,
+            width: "auto",
           }}
         >
           <ChordRenderer
@@ -341,43 +412,42 @@ export default function SongView({ songId }: { songId: string }) {
         </div>
       )}
 
-      {/* Floating Controls (sit above the scroll scrubber) */}
-      <div className="absolute bottom-[4.5rem] right-4 sm:right-6 flex flex-col gap-3 items-center z-20">
+      {/* Floating Controls (sit above the scroll scrubber and tap zones) */}
+      <div
+        data-no-page-nav
+        className="absolute bottom-[5.5rem] right-4 sm:right-6 flex flex-col gap-3 items-center z-20"
+      >
         <div className="flex flex-col bg-card border border-border shadow-lg rounded-full overflow-hidden">
           <Button
             variant="ghost"
             size="icon"
             className="h-10 w-10 rounded-none"
-            onClick={() =>
-              layoutMode === "auto"
-                ? auto.nudgeZoom(0.1)
-                : setZoom(Math.min(3, zoom + 0.1))
-            }
+            onClick={zoomIn}
             aria-label="Zoom in"
           >
             <Plus className="w-4 h-4" />
           </Button>
-          <div className="h-[1px] w-full bg-border" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-none text-[11px] font-semibold"
-            onClick={() => (layoutMode === "auto" ? auto.refit() : fitToScreen())}
-            aria-label="Fit song to screen"
-            title="Fit whole song on screen"
-          >
-            Fit
-          </Button>
+          {!isSplit && (
+            <>
+              <div className="h-[1px] w-full bg-border" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-none text-[11px] font-semibold"
+                onClick={fitToScreen}
+                aria-label="Fit song to screen"
+                title="Fit whole song on screen"
+              >
+                Fit
+              </Button>
+            </>
+          )}
           <div className="h-[1px] w-full bg-border" />
           <Button
             variant="ghost"
             size="icon"
             className="h-10 w-10 rounded-none"
-            onClick={() =>
-              layoutMode === "auto"
-                ? auto.nudgeZoom(-0.1)
-                : setZoom(Math.max(0.5, zoom - 0.1))
-            }
+            onClick={zoomOut}
             aria-label="Zoom out"
           >
             <Minus className="w-4 h-4" />
@@ -407,8 +477,10 @@ export default function SongView({ songId }: { songId: string }) {
         </Button>
       </div>
 
-      {/* Always-visible auto-scroll speed scrubber */}
-      <BottomScrollScrubber scrollRef={scrollRef} />
+      {/* Auto-scroll scrubber — only meaningful in single-column scroll mode. */}
+      {!isSplit && (
+        <BottomScrollScrubber scrollRef={scrollRef} songId={song.id} />
+      )}
 
       <MediaPlayerModal
         song={song}

@@ -42,6 +42,8 @@ export default function SettingsDialog() {
     setLyricsFontSize,
     chordsFontSize,
     setChordsFontSize,
+    autoScrollSpeed,
+    setAutoScrollSpeed,
     autoScrollMinSpeed,
     setAutoScrollMinSpeed,
     autoScrollMaxSpeed,
@@ -131,13 +133,24 @@ export default function SettingsDialog() {
                 <AlignLeft className="w-4 h-4 mr-2" /> Scroll
               </Button>
               <Button
-                variant={displayMode !== "scroll" ? "default" : "outline"}
+                variant={displayMode === "split" ? "default" : "outline"}
+                onClick={() => setDisplayMode("split")}
+                className="flex-1"
+              >
+                <Columns className="w-4 h-4 mr-2" /> Split
+              </Button>
+              <Button
+                variant={displayMode === "auto" ? "default" : "outline"}
                 onClick={() => setDisplayMode("auto")}
                 className="flex-1"
               >
-                <Columns className="w-4 h-4 mr-2" /> Auto-fit
+                <Wand2 className="w-4 h-4 mr-2" /> Auto
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Scroll glides down one column. Split paginates into columns (tap
+              sides to turn pages). Auto picks based on screen width.
+            </p>
           </div>
 
           {/* Font sizes */}
@@ -175,6 +188,20 @@ export default function SettingsDialog() {
           <div className="h-px bg-border" />
 
           {/* Auto-scroll */}
+          <div className="space-y-3">
+            <Label>Auto-scroll base speed — 1× ({autoScrollSpeed} px/s)</Label>
+            <Slider
+              value={[autoScrollSpeed]}
+              min={autoScrollMinSpeed}
+              max={autoScrollMaxSpeed}
+              step={1}
+              onValueChange={([val]) => setAutoScrollSpeed(val)}
+            />
+            <p className="text-xs text-muted-foreground">
+              The scrubber's dead-center (1×) maps to this speed; drag toward the
+              ends to reach min/max.
+            </p>
+          </div>
           <div className="space-y-3">
             <Label>Auto-scroll min speed ({autoScrollMinSpeed} px/s)</Label>
             <Slider

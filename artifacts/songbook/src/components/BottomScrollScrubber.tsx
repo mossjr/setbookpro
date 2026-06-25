@@ -6,51 +6,73 @@ import {
   type RefObject,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { useSettingsStore, useAppStore } from "@/store";
-import { formatTime } from "@/lib/media";
-import { Play, Pause, Gauge } from "lucide-react";
+import { useSettingsStore } from "@/store";
+import { Play, Pause } from "lucide-react";
 
 interface BottomScrollScrubberProps {
   scrollRef: RefObject<HTMLDivElement | null>;
+  songId: string;
 }
 
-const DRAG_THRESHOLD = 6;
+const DRAG_THRESHOLD = 5;
+
+/** Speed (px/s) → handle position 0..1, with the base speed pinned dead-center. */
+function speedToPos(speed: number, min: number, base: number, max: number) {
+  if (speed <= base) {
+    return base > min ? 0.5 * ((speed - min) / (base - min)) : 0;
+  }
+  return max > base ? 0.5 + 0.5 * ((speed - base) / (max - base)) : 1;
+}
+
+/** Handle position 0..1 → speed (px/s); center maps back to the base speed. */
+function posToSpeed(pos: number, min: number, base: number, max: number) {
+  const r = Math.min(1, Math.max(0, pos));
+  const speed =
+    r <= 0.5 ? min + (r / 0.5) * (base - min) : base + ((r - 0.5) / 0.5) * (max - base);
+  return Math.round(speed);
+}
 
 export default function BottomScrollScrubber({
   scrollRef,
+  songId,
 }: BottomScrollScrubberProps) {
   const {
     autoScrollSpeed,
-    setAutoScrollSpeed,
     autoScrollMinSpeed,
     autoScrollMaxSpeed,
     autoScrollStartDelay,
+    songScrollSpeeds,
+    setSongScrollSpeed,
   } = useSettingsStore();
-  const { displayMode, setDisplayMode } = useAppStore();
+
+  const base = autoScrollSpeed;
+  const min = autoScrollMinSpeed;
+  const max = autoScrollMaxSpeed;
+
+  const currentSpeed = Math.min(
+    max,
+    Math.max(min, songScrollSpeeds[songId] ?? base),
+  );
 
   const [isScrolling, setIsScrolling] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const [estSeconds, setEstSeconds] = useState(0);
 
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number>(0);
-  const speedRef = useRef(autoScrollSpeed);
+  const speedRef = useRef(currentSpeed);
   const delayTimerRef = useRef<number | null>(null);
-  const barRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ startX: number; dragging: boolean }>({
     startX: 0,
     dragging: false,
   });
 
   useEffect(() => {
-    speedRef.current = autoScrollSpeed;
-  }, [autoScrollSpeed]);
+    speedRef.current = currentSpeed;
+  }, [currentSpeed]);
 
-  const range = Math.max(1, autoScrollMaxSpeed - autoScrollMinSpeed);
-  const fillPct = Math.min(
-    100,
-    Math.max(0, ((autoScrollSpeed - autoScrollMinSpeed) / range) * 100),
-  );
+  const pos = speedToPos(currentSpeed, min, base, max);
+  const multiplier = base > 0 ? currentSpeed / base : 1;
 
   const stop = useCallback(() => {
     setIsScrolling(false);
@@ -80,12 +102,10 @@ export default function BottomScrollScrubber({
   );
 
   const begin = useCallback(() => {
-    // Multi-column / auto-fit layout cannot vertical-scroll; force scroll mode.
-    if (displayMode !== "scroll") setDisplayMode("scroll");
     setIsScrolling(true);
     lastTsRef.current = 0;
     rafRef.current = requestAnimationFrame(step);
-  }, [displayMode, setDisplayMode, step]);
+  }, [step]);
 
   const start = useCallback(() => {
     if (autoScrollStartDelay > 0) {
@@ -125,44 +145,25 @@ export default function BottomScrollScrubber({
     };
   }, []);
 
-  // Keep the time estimate fresh whether idle or scrolling.
-  useEffect(() => {
-    const update = () => {
-      const el = scrollRef.current;
-      if (!el) return;
-      const remainingPx = isScrolling
-        ? Math.max(0, el.scrollHeight - el.clientHeight - el.scrollTop)
-        : Math.max(0, el.scrollHeight - el.clientHeight);
-      setEstSeconds(remainingPx / Math.max(1, autoScrollSpeed));
-    };
-    update();
-    const id = window.setInterval(update, 500);
-    return () => clearInterval(id);
-  }, [scrollRef, autoScrollSpeed, isScrolling]);
-
   const applySpeedFromX = (clientX: number) => {
-    const bar = barRef.current;
-    if (!bar) return;
-    const rect = bar.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    const next = Math.round(
-      autoScrollMinSpeed + ratio * (autoScrollMaxSpeed - autoScrollMinSpeed),
-    );
-    setAutoScrollSpeed(next);
+    const track = trackRef.current;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = (clientX - rect.left) / rect.width;
+    const next = posToSpeed(ratio, min, base, max);
+    speedRef.current = next;
+    setSongScrollSpeed(songId, next);
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    barRef.current?.setPointerCapture(e.pointerId);
+    trackRef.current?.setPointerCapture(e.pointerId);
     dragStateRef.current = { startX: e.clientX, dragging: false };
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const st = dragStateRef.current;
-    if (!barRef.current?.hasPointerCapture(e.pointerId)) return;
-    if (
-      !st.dragging &&
-      Math.abs(e.clientX - st.startX) > DRAG_THRESHOLD
-    ) {
+    if (!trackRef.current?.hasPointerCapture(e.pointerId)) return;
+    if (!st.dragging && Math.abs(e.clientX - st.startX) > DRAG_THRESHOLD) {
       st.dragging = true;
     }
     if (st.dragging) applySpeedFromX(e.clientX);
@@ -170,59 +171,64 @@ export default function BottomScrollScrubber({
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     const st = dragStateRef.current;
-    barRef.current?.releasePointerCapture(e.pointerId);
-    if (!st.dragging) {
-      toggle();
-    }
+    trackRef.current?.releasePointerCapture(e.pointerId);
+    if (!st.dragging) toggle();
     st.dragging = false;
   };
 
   const active = isScrolling || countdown > 0;
 
   return (
-    <div
-      ref={barRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      className={`relative h-14 w-full shrink-0 border-t border-border cursor-pointer select-none touch-none overflow-hidden ${
-        active ? "bg-primary/10" : "bg-card"
-      }`}
-      title="Tap to start/stop auto-scroll · drag to set speed"
-    >
-      {/* Speed fill */}
+    <div className="relative h-20 w-full shrink-0 border-t border-border bg-card select-none">
+      {/* Edge + center labels */}
+      <div className="absolute inset-x-6 top-2 flex justify-between text-[10px] font-medium uppercase tracking-wide text-muted-foreground pointer-events-none">
+        <span>Slower</span>
+        <span className={active ? "text-primary" : ""}>
+          {countdown > 0
+            ? `Starting in ${countdown}…`
+            : `${multiplier.toFixed(2)}×`}
+        </span>
+        <span>Faster</span>
+      </div>
+
+      {/* Track + draggable circular handle */}
       <div
-        className={`absolute inset-y-0 left-0 ${
-          active ? "bg-primary/30" : "bg-muted"
-        }`}
-        style={{ width: `${fillPct}%` }}
-      />
+        ref={trackRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        className="absolute left-8 right-8 top-1/2 mt-1 -translate-y-1/2 h-1.5 rounded-full bg-muted touch-none cursor-pointer"
+      >
+        {/* Center (1×) tick */}
+        <div className="absolute left-1/2 top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-border" />
 
-      <div className="relative h-full flex items-center justify-between px-4 pointer-events-none">
-        <div className="flex items-center gap-2">
+        {/* Fill from center to the handle */}
+        <div
+          className={`absolute top-0 h-full rounded-full ${active ? "bg-primary/50" : "bg-foreground/20"}`}
+          style={{
+            left: `${Math.min(50, pos * 100)}%`,
+            right: `${Math.max(0, 100 - Math.max(50, pos * 100))}%`,
+          }}
+        />
+
+        {/* Circular Scroll button — lights up when active */}
+        <button
+          type="button"
+          aria-label={active ? "Stop auto-scroll" : "Start auto-scroll"}
+          aria-pressed={active}
+          className={`absolute top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full shadow-lg transition-all ${
+            active
+              ? "bg-primary text-primary-foreground ring-4 ring-primary/30 scale-105"
+              : "bg-card border border-border text-foreground"
+          }`}
+          style={{ left: `${pos * 100}%` }}
+        >
           {active ? (
-            <Pause className="w-5 h-5 text-primary" />
+            <Pause className="h-5 w-5" />
           ) : (
-            <Play className="w-5 h-5 text-muted-foreground ml-0.5" />
+            <Play className="ml-0.5 h-5 w-5" />
           )}
-          <span className="text-sm font-medium">
-            {countdown > 0
-              ? `Starting in ${countdown}…`
-              : active
-                ? "Auto-scrolling"
-                : "Auto-scroll"}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1 font-mono">
-            <Gauge className="w-4 h-4" />
-            {autoScrollSpeed}
-          </span>
-          <span className="font-mono tabular-nums">
-            ≈ {formatTime(estSeconds)}
-          </span>
-        </div>
+        </button>
       </div>
     </div>
   );

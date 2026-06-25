@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-type DisplayMode = 'scroll' | 'columns' | 'auto';
+type DisplayMode = 'scroll' | 'split' | 'auto';
 
 interface SettingsState {
   theme: 'light' | 'dark' | 'system';
@@ -25,6 +25,9 @@ interface SettingsState {
   setAutoScrollMaxSpeed: (speed: number) => void;
   autoScrollStartDelay: number;
   setAutoScrollStartDelay: (seconds: number) => void;
+  // Per-song saved auto-scroll speed (px/sec), keyed by song id.
+  songScrollSpeeds: Record<string, number>;
+  setSongScrollSpeed: (songId: string, speed: number) => void;
   // Metronome.
   metronomeFlash: boolean;
   setMetronomeFlash: (on: boolean) => void;
@@ -63,20 +66,73 @@ export const useSettingsStore = create<SettingsState>()(
       instrument: 'guitar',
       setInstrument: (instrument) => set({ instrument }),
       autoScrollSpeed: 40,
-      setAutoScrollSpeed: (autoScrollSpeed) => set({ autoScrollSpeed }),
+      setAutoScrollSpeed: (autoScrollSpeed) =>
+        set((s) => ({
+          autoScrollSpeed: Math.min(
+            Math.max(autoScrollSpeed, s.autoScrollMinSpeed),
+            s.autoScrollMaxSpeed,
+          ),
+        })),
       autoScrollMinSpeed: 10,
-      setAutoScrollMinSpeed: (autoScrollMinSpeed) => set({ autoScrollMinSpeed }),
+      setAutoScrollMinSpeed: (val) =>
+        set((s) => {
+          const autoScrollMinSpeed = Math.min(val, s.autoScrollMaxSpeed);
+          return {
+            autoScrollMinSpeed,
+            autoScrollSpeed: Math.min(
+              Math.max(s.autoScrollSpeed, autoScrollMinSpeed),
+              s.autoScrollMaxSpeed,
+            ),
+          };
+        }),
       autoScrollMaxSpeed: 200,
-      setAutoScrollMaxSpeed: (autoScrollMaxSpeed) => set({ autoScrollMaxSpeed }),
+      setAutoScrollMaxSpeed: (val) =>
+        set((s) => {
+          const autoScrollMaxSpeed = Math.max(val, s.autoScrollMinSpeed);
+          return {
+            autoScrollMaxSpeed,
+            autoScrollSpeed: Math.min(
+              Math.max(s.autoScrollSpeed, s.autoScrollMinSpeed),
+              autoScrollMaxSpeed,
+            ),
+          };
+        }),
       autoScrollStartDelay: 0,
       setAutoScrollStartDelay: (autoScrollStartDelay) =>
         set({ autoScrollStartDelay }),
+      songScrollSpeeds: {},
+      setSongScrollSpeed: (songId, speed) =>
+        set((state) => ({
+          songScrollSpeeds: { ...state.songScrollSpeeds, [songId]: speed },
+        })),
       metronomeFlash: false,
       setMetronomeFlash: (metronomeFlash) => set({ metronomeFlash }),
       metronomeSound: true,
       setMetronomeSound: (metronomeSound) => set({ metronomeSound }),
     }),
-    { name: 'songbook-settings' }
+    {
+      name: 'songbook-settings',
+      version: 1,
+      // Ensure a previously-persisted speed range is internally consistent and
+      // that the base (1×) speed sits within [min, max] on rehydration.
+      migrate: (persisted, _version) => {
+        const s = persisted as Partial<SettingsState> | undefined;
+        if (s) {
+          const min =
+            typeof s.autoScrollMinSpeed === 'number' ? s.autoScrollMinSpeed : 10;
+          const max = Math.max(
+            min,
+            typeof s.autoScrollMaxSpeed === 'number' ? s.autoScrollMaxSpeed : 200,
+          );
+          s.autoScrollMinSpeed = min;
+          s.autoScrollMaxSpeed = max;
+          if (typeof s.autoScrollSpeed === 'number') {
+            s.autoScrollSpeed = Math.min(Math.max(s.autoScrollSpeed, min), max);
+          }
+        }
+        return s as SettingsState;
+      },
+    }
   )
 );
 
@@ -98,6 +154,14 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'songbook-app-state',
+      version: 1,
+      migrate: (persisted, _version) => {
+        const state = persisted as Partial<AppState> | undefined;
+        if (state && (state.displayMode as string) === 'columns') {
+          state.displayMode = 'split';
+        }
+        return state as AppState;
+      },
       partialize: (state) => ({ 
         token: state.token, 
         zoom: state.zoom, 
