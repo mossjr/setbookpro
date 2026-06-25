@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useRef, useEffect } from "react";
 import { useGetSong, getGetSongQueryKey } from "@workspace/api-client-react";
 import { useAppStore, useSettingsStore } from "@/store";
 import ChordRenderer from "./ChordRenderer";
@@ -9,9 +8,8 @@ import BottomScrollScrubber from "./BottomScrollScrubber";
 import SettingsDialog from "./SettingsDialog";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
-import { resolveAudioUrl, parseSpotifyEmbedUrl } from "@/lib/media";
+import { resolveAudioUrl } from "@/lib/media";
 import { parseYouTubeId } from "@/lib/youtube";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
@@ -22,7 +20,6 @@ import {
   Play,
   Pause,
   Music,
-  Music2,
   Eye,
 } from "lucide-react";
 
@@ -66,51 +63,13 @@ export default function SongView({ songId }: { songId: string }) {
     song?.mediaType === "youtube" && song.youtubeUrl
       ? parseYouTubeId(song.youtubeUrl)
       : null;
-  const spotifyEmbed =
-    song?.mediaType === "spotify" && song.spotifyLink
-      ? parseSpotifyEmbedUrl(song.spotifyLink)
-      : null;
 
-  // Persistent host node for the YouTube/Spotify iframe. Created once and
-  // physically relocated (appendChild) between the in-modal slot and the
-  // closed-state mini-player, so playback survives the modal opening/closing.
-  const ytHostRef = useRef<HTMLDivElement | null>(null);
-  if (ytHostRef.current === null && typeof document !== "undefined") {
-    ytHostRef.current = document.createElement("div");
-    ytHostRef.current.style.width = "100%";
-  }
-  const ytInnerRef = useRef<HTMLDivElement>(null);
-  const closedSlotRef = useRef<HTMLDivElement>(null);
-  const modalSlotRef = useRef<HTMLDivElement>(null);
-
-  const yt = useYouTubePlayer(ytInnerRef, youtubeVideoId);
-
-  // Move the persistent host into whichever slot is currently mounted/visible.
-  // appendChild on the same node keeps the iframe alive (never unmounted), so
-  // YouTube playback continues across modal toggles. Runs before paint so the
-  // node is never painted inside a hidden slot.
-  useLayoutEffect(() => {
-    const host = ytHostRef.current;
-    if (!host) return;
-    const target = mediaOpen ? modalSlotRef.current : closedSlotRef.current;
-    if (target && host.parentElement !== target) {
-      target.appendChild(host);
-    }
-  });
-
-  const handleMediaOpenChange = (next: boolean) => {
-    // When closing, move the persistent host back to the always-mounted slot
-    // BEFORE the dialog unmounts. Otherwise the host (an imperative child of the
-    // modal slot) is torn down with the dialog subtree, reloading the iframe.
-    if (!next) {
-      const host = ytHostRef.current;
-      const home = closedSlotRef.current;
-      if (host && home && host.parentElement !== home) {
-        home.appendChild(host);
-      }
-    }
-    setMediaOpen(next);
-  };
+  // The YouTube iframe lives in this wrapper, which is rendered once inside the
+  // always-mounted media panel. Because the wrapper is never unmounted or moved,
+  // the iframe never reloads — so playback continues and the floating tap-toggle
+  // stays in sync whether the panel is open or closed.
+  const ytWrapperRef = useRef<HTMLDivElement>(null);
+  const yt = useYouTubePlayer(ytWrapperRef, youtubeVideoId);
 
   if (isLoading)
     return (
@@ -136,11 +95,8 @@ export default function SongView({ songId }: { songId: string }) {
         if (youtubeVideoId) yt.toggle();
         else setMediaOpen(true);
         break;
-      case "spotify":
-        // Spotify embeds can't be controlled programmatically; open the modal.
-        setMediaOpen(true);
-        break;
       default:
+        // No controllable source attached (or a legacy one) — open the player.
         setMediaOpen(true);
     }
   };
@@ -179,7 +135,6 @@ export default function SongView({ songId }: { songId: string }) {
       ) : (
         <Play className="w-6 h-6 ml-1" />
       );
-    if (song.mediaType === "spotify") return <Music2 className="w-6 h-6" />;
     return <Music className="w-6 h-6" />;
   };
 
@@ -189,17 +144,13 @@ export default function SongView({ songId }: { songId: string }) {
         return audio.isPlaying ? "Pause audio" : "Play audio";
       case "youtube":
         return yt.isPlaying ? "Pause video" : "Play video";
-      case "spotify":
-        return "Open media player";
       default:
         return "Add media";
     }
   };
 
-  const hasMedia = song.mediaType !== "none";
-  const showMiniPlayer =
-    !mediaOpen &&
-    (song.mediaType === "youtube" || song.mediaType === "spotify");
+  const hasMedia =
+    song.mediaType === "audio" || song.mediaType === "youtube";
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
@@ -345,46 +296,13 @@ export default function SongView({ songId }: { songId: string }) {
       {/* Always-visible auto-scroll speed scrubber */}
       <BottomScrollScrubber scrollRef={scrollRef} />
 
-      {/* Persistent mini-player: keeps YouTube/Spotify audible while the modal
-          is closed. The shared host node docks here (visible) or in the modal. */}
-      <div
-        ref={closedSlotRef}
-        className={cn(
-          "fixed left-4 bottom-[4.5rem] z-30 w-44 overflow-hidden rounded-lg border border-border bg-black shadow-xl sm:w-56",
-          showMiniPlayer ? "block" : "hidden",
-        )}
-      />
-
-      {/* Host contents rendered via portal into the relocatable node above. */}
-      {ytHostRef.current &&
-        createPortal(
-          <>
-            {song.mediaType === "youtube" && youtubeVideoId && (
-              <div className="aspect-video w-full bg-black">
-                <div ref={ytInnerRef} className="h-full w-full" />
-              </div>
-            )}
-            {song.mediaType === "spotify" && spotifyEmbed && (
-              <iframe
-                title="Spotify player"
-                src={spotifyEmbed}
-                className="w-full"
-                height={152}
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-              />
-            )}
-          </>,
-          ytHostRef.current,
-        )}
-
       <MediaPlayerModal
         song={song}
         audio={audio}
         youtube={yt}
-        youtubeSlotRef={modalSlotRef}
+        ytWrapperRef={ytWrapperRef}
         open={mediaOpen}
-        onOpenChange={handleMediaOpenChange}
+        onOpenChange={setMediaOpen}
       />
     </div>
   );

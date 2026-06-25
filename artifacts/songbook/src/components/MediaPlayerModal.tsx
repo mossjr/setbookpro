@@ -6,18 +6,10 @@ import {
   useUpdateSong,
   useSearchYoutube,
   getSearchYoutubeQueryKey,
-  useSearchSpotify,
-  getSearchSpotifyQueryKey,
   getGetSongQueryKey,
   getListSongsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -28,7 +20,8 @@ import { type AudioController } from "@/hooks/useAudioPlayer";
 import { type YouTubeController } from "@/hooks/useYouTubePlayer";
 import { useAudioUpload } from "@/lib/upload";
 import { parseYouTubeId } from "@/lib/youtube";
-import { parseSpotifyEmbedUrl, formatTime } from "@/lib/media";
+import { formatTime } from "@/lib/media";
+import { cn } from "@/lib/utils";
 import {
   Play,
   Pause,
@@ -36,16 +29,17 @@ import {
   Trash2,
   FileAudio,
   Youtube,
-  Music2,
   Loader2,
   Search,
+  X,
 } from "lucide-react";
 
 interface MediaPlayerModalProps {
   song: Song;
   audio: AudioController;
   youtube: YouTubeController;
-  youtubeSlotRef: RefObject<HTMLDivElement | null>;
+  /** Container (owned by SongView) where the persistent YouTube iframe lives. */
+  ytWrapperRef: RefObject<HTMLDivElement | null>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -59,6 +53,7 @@ interface TransportProps {
   disabled?: boolean;
 }
 
+/** Generic play/pause + scrub transport, identical for every media source. */
 function MediaTransport({
   isPlaying,
   currentTime,
@@ -74,6 +69,7 @@ function MediaTransport({
         className="h-12 w-12 rounded-full shrink-0"
         onClick={onToggle}
         disabled={disabled}
+        aria-label={isPlaying ? "Pause" : "Play"}
       >
         {isPlaying ? (
           <Pause className="w-5 h-5" />
@@ -89,6 +85,7 @@ function MediaTransport({
           step={0.1}
           onValueChange={([v]) => onSeek(v)}
           disabled={disabled || !duration}
+          aria-label="Seek"
         />
         <div className="flex justify-between text-xs text-muted-foreground font-mono">
           <span>{formatTime(currentTime)}</span>
@@ -103,24 +100,15 @@ function SearchResults({
   items,
   isFetching,
   isError,
-  notConfigured,
   emptyHint,
   onPick,
 }: {
   items: MediaSearchItem[];
   isFetching: boolean;
   isError: boolean;
-  notConfigured?: boolean;
   emptyHint: string;
   onPick: (item: MediaSearchItem) => void;
 }) {
-  if (notConfigured) {
-    return (
-      <p className="text-xs text-muted-foreground py-3 text-center">
-        Spotify search isn’t set up on the server yet.
-      </p>
-    );
-  }
   if (isFetching) {
     return (
       <div className="flex items-center justify-center py-6 text-muted-foreground">
@@ -179,7 +167,7 @@ export default function MediaPlayerModal({
   song,
   audio,
   youtube,
-  youtubeSlotRef,
+  ytWrapperRef,
   open,
   onOpenChange,
 }: MediaPlayerModalProps) {
@@ -188,55 +176,37 @@ export default function MediaPlayerModal({
   const updateMutation = useUpdateSong();
   const { upload, isUploading, progress } = useAudioUpload();
 
-  const [spotifyInput, setSpotifyInput] = useState(song.spotifyLink ?? "");
   const [youtubeInput, setYoutubeInput] = useState(song.youtubeUrl ?? "");
 
   const initialTerm = [song.title, song.artist]
     .filter(Boolean)
     .join(" ")
     .trim();
-  const [spTerm, setSpTerm] = useState(initialTerm);
-  const [spQuery, setSpQuery] = useState(initialTerm);
-  const [spSearchOpen, setSpSearchOpen] = useState(false);
   const [ytTerm, setYtTerm] = useState(initialTerm);
   const [ytQuery, setYtQuery] = useState(initialTerm);
   const [ytSearchOpen, setYtSearchOpen] = useState(false);
 
   useEffect(() => {
-    setSpotifyInput(song.spotifyLink ?? "");
     setYoutubeInput(song.youtubeUrl ?? "");
-  }, [song.spotifyLink, song.youtubeUrl]);
+  }, [song.youtubeUrl]);
 
   useEffect(() => {
     const term = [song.title, song.artist].filter(Boolean).join(" ").trim();
-    setSpTerm(term);
-    setSpQuery(term);
-    setSpSearchOpen(false);
     setYtTerm(term);
     setYtQuery(term);
     setYtSearchOpen(false);
   }, [song.id, song.title, song.artist]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const audioConfigured = !!song.audioUrl;
-  const spotifyConfigured = !!song.spotifyLink;
   const youtubeVideoId = song.youtubeUrl
     ? parseYouTubeId(song.youtubeUrl)
     : null;
   const youtubeConfigured = !!youtubeVideoId;
 
-  const spotifySearch = useSearchSpotify(
-    { q: spQuery },
-    {
-      query: {
-        enabled: open && spSearchOpen && spQuery.trim().length > 0,
-        queryKey: getSearchSpotifyQueryKey({ q: spQuery }),
-        staleTime: 5 * 60 * 1000,
-        retry: false,
-      },
-    },
-  );
   const youtubeSearch = useSearchYoutube(
     { q: ytQuery },
     {
@@ -248,7 +218,67 @@ export default function MediaPlayerModal({
       },
     },
   );
-  const spotifyNotConfigured = spotifySearch.error?.status === 503;
+
+  // Keep the iframe alive (opacity, not display:none) when closed so audio
+  // keeps playing; mark the offscreen subtree inert/hidden from a11y.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (open) el.removeAttribute("inert");
+    else el.setAttribute("inert", "");
+  }, [open]);
+
+  // Focus trap, Escape-to-close, scroll lock, and focus restoration.
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const getFocusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((el) => el.offsetParent !== null);
+
+    (getFocusable()[0] ?? dialog)?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onOpenChange(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = getFocusable();
+      if (items.length === 0) {
+        e.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (dialog && active && !dialog.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [open, onOpenChange]);
 
   const persist = (data: Parameters<typeof updateMutation.mutate>[0]["data"]) => {
     updateMutation.mutate(
@@ -306,23 +336,6 @@ export default function MediaPlayerModal({
     });
   };
 
-  const saveSpotify = () => {
-    const embed = parseSpotifyEmbedUrl(spotifyInput);
-    if (!embed) {
-      toast({ title: "Not a valid Spotify link", variant: "destructive" });
-      return;
-    }
-    audio.pause();
-    youtube.pause();
-    persist({ mediaType: "spotify", spotifyLink: spotifyInput.trim() });
-  };
-
-  const removeSpotify = () =>
-    persist({
-      mediaType: song.mediaType === "spotify" ? "none" : song.mediaType,
-      spotifyLink: null,
-    });
-
   const saveYoutube = () => {
     if (!parseYouTubeId(youtubeInput)) {
       toast({ title: "Not a valid YouTube link", variant: "destructive" });
@@ -340,34 +353,11 @@ export default function MediaPlayerModal({
     });
   };
 
-  const runSpotifySearch = () => {
-    const term = spTerm.trim();
-    if (!term) return;
-    setSpQuery(term);
-    setSpSearchOpen(true);
-  };
-
   const runYoutubeSearch = () => {
     const term = ytTerm.trim();
     if (!term) return;
     setYtQuery(term);
     setYtSearchOpen(true);
-  };
-
-  const pickSpotify = (item: MediaSearchItem) => {
-    if (!parseSpotifyEmbedUrl(item.url)) {
-      toast({
-        title: "Couldn't use that Spotify result",
-        variant: "destructive",
-      });
-      return;
-    }
-    audio.pause();
-    youtube.pause();
-    setSpotifyInput(item.url);
-    persist({ mediaType: "spotify", spotifyLink: item.url });
-    setSpSearchOpen(false);
-    toast({ title: `Spotify set: ${item.title}` });
   };
 
   const pickYoutube = (item: MediaSearchItem) => {
@@ -391,12 +381,6 @@ export default function MediaPlayerModal({
       configured: audioConfigured,
     },
     {
-      type: "spotify",
-      label: "Spotify",
-      icon: <Music2 className="w-4 h-4" />,
-      configured: spotifyConfigured,
-    },
-    {
       type: "youtube",
       label: "YouTube",
       icon: <Youtube className="w-4 h-4" />,
@@ -404,19 +388,77 @@ export default function MediaPlayerModal({
     },
   ];
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="truncate pr-6">
-            {song.title}
-            <span className="block text-sm font-normal text-muted-foreground truncate">
-              {song.artist}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
+  // Which generic transport drives the active source.
+  const activeTransport =
+    song.mediaType === "audio" && audioConfigured ? (
+      <MediaTransport
+        isPlaying={audio.isPlaying}
+        currentTime={audio.currentTime}
+        duration={audio.duration}
+        onToggle={audio.toggle}
+        onSeek={audio.seek}
+      />
+    ) : song.mediaType === "youtube" && youtubeConfigured ? (
+      <MediaTransport
+        isPlaying={youtube.isPlaying}
+        currentTime={youtube.currentTime}
+        duration={youtube.duration}
+        onToggle={youtube.toggle}
+        onSeek={youtube.seek}
+        disabled={!youtube.ready}
+      />
+    ) : null;
 
-        {/* Active source switcher */}
+  return (
+    <div
+      ref={rootRef}
+      aria-hidden={!open}
+      className={cn(
+        "fixed inset-0 z-50 flex items-end sm:items-center justify-center transition-opacity duration-200",
+        open ? "opacity-100" : "pointer-events-none opacity-0",
+      )}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60"
+        onClick={() => onOpenChange(false)}
+      />
+
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Media player: ${song.title}`}
+        tabIndex={-1}
+        className={cn(
+          "relative z-10 w-full sm:max-w-lg max-h-[88vh] overflow-y-auto bg-background shadow-xl outline-none",
+          "rounded-t-2xl sm:rounded-2xl border border-border p-5 space-y-4",
+          "transition-transform duration-200",
+          open ? "translate-y-0" : "translate-y-4 sm:translate-y-0",
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-semibold truncate leading-tight">
+              {song.title}
+            </h2>
+            <p className="text-sm text-muted-foreground truncate">
+              {song.artist}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 -mr-2 -mt-1"
+            onClick={() => onOpenChange(false)}
+            aria-label="Close media player"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Source switcher (only enabled once a source is attached) */}
         <div className="flex gap-2">
           {sourceButtons.map((s) => (
             <Button
@@ -427,59 +469,32 @@ export default function MediaPlayerModal({
               onClick={() => setActive(s.type)}
             >
               {s.icon}
-              <span className="hidden sm:inline">{s.label}</span>
+              <span>{s.label}</span>
             </Button>
           ))}
         </div>
 
-        {/* Active player */}
-        <div className="min-h-[3rem]">
-          {song.mediaType === "audio" && audioConfigured && (
-            <div className="space-y-2">
-              <MediaTransport
-                isPlaying={audio.isPlaying}
-                currentTime={audio.currentTime}
-                duration={audio.duration}
-                onToggle={audio.toggle}
-                onSeek={audio.seek}
-              />
-              {song.audioFileName && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {song.audioFileName}
-                </p>
-              )}
+        {/* Player surface */}
+        <div className="space-y-3">
+          {/* YouTube video container — ALWAYS mounted so the iframe persists
+              across open/close (it is never moved or unmounted, so it never
+              reloads). Hidden unless YouTube is the active source. */}
+          <div className={cn(song.mediaType === "youtube" ? "block" : "hidden")}>
+            <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
+              <div ref={ytWrapperRef} className="h-full w-full" />
             </div>
+          </div>
+
+          {activeTransport}
+
+          {song.mediaType === "audio" && audioConfigured && song.audioFileName && (
+            <p className="text-xs text-muted-foreground truncate">
+              {song.audioFileName}
+            </p>
           )}
 
-          {(song.mediaType === "youtube" || song.mediaType === "spotify") && (
-            <div className="space-y-3">
-              {/* The persistent YouTube/Spotify host (owned by SongView) docks
-                  here while the modal is open, then returns to the mini-player. */}
-              <div
-                ref={youtubeSlotRef}
-                className="w-full overflow-hidden rounded-md"
-              />
-              {song.mediaType === "youtube" && youtubeConfigured && (
-                <MediaTransport
-                  isPlaying={youtube.isPlaying}
-                  currentTime={youtube.currentTime}
-                  duration={youtube.duration}
-                  onToggle={youtube.toggle}
-                  onSeek={youtube.seek}
-                  disabled={!youtube.ready}
-                />
-              )}
-              {song.mediaType === "spotify" && (
-                <p className="text-xs text-muted-foreground">
-                  Spotify plays through its own embedded controls and keeps
-                  playing when this player is closed.
-                </p>
-              )}
-            </div>
-          )}
-
-          {song.mediaType === "none" && (
-            <p className="text-sm text-muted-foreground text-center py-4">
+          {!activeTransport && (
+            <p className="text-sm text-muted-foreground text-center py-3">
               No media attached yet. Add a source below.
             </p>
           )}
@@ -489,7 +504,7 @@ export default function MediaPlayerModal({
 
         {/* Setup / sources */}
         <div className="space-y-5">
-          {/* Audio */}
+          {/* Uploaded audio */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <FileAudio className="w-4 h-4" /> Uploaded audio
@@ -523,6 +538,7 @@ export default function MediaPlayerModal({
                   size="icon"
                   onClick={removeAudio}
                   disabled={isUploading}
+                  aria-label="Remove audio"
                 >
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
@@ -543,62 +559,6 @@ export default function MediaPlayerModal({
               </Button>
             )}
             {isUploading && <Progress value={progress} className="h-1" />}
-          </div>
-
-          {/* Spotify */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Music2 className="w-4 h-4" /> Spotify
-            </Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  placeholder="Search Spotify…"
-                  value={spTerm}
-                  onChange={(e) => setSpTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      runSpotifySearch();
-                    }
-                  }}
-                />
-              </div>
-              <Button onClick={runSpotifySearch} disabled={!spTerm.trim()}>
-                Search
-              </Button>
-            </div>
-            {spSearchOpen && (
-              <SearchResults
-                items={spotifySearch.data?.results ?? []}
-                isFetching={spotifySearch.isFetching}
-                isError={!!spotifySearch.error && !spotifyNotConfigured}
-                notConfigured={spotifyNotConfigured}
-                emptyHint="No tracks found."
-                onPick={pickSpotify}
-              />
-            )}
-            <div className="flex gap-2">
-              <Input
-                placeholder="or paste a Spotify link"
-                value={spotifyInput}
-                onChange={(e) => setSpotifyInput(e.target.value)}
-              />
-              <Button
-                variant="secondary"
-                onClick={saveSpotify}
-                disabled={!spotifyInput.trim()}
-              >
-                Save
-              </Button>
-              {spotifyConfigured && (
-                <Button variant="ghost" size="icon" onClick={removeSpotify}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              )}
-            </div>
           </div>
 
           {/* YouTube */}
@@ -649,14 +609,19 @@ export default function MediaPlayerModal({
                 Save
               </Button>
               {youtubeConfigured && (
-                <Button variant="ghost" size="icon" onClick={removeYoutube}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={removeYoutube}
+                  aria-label="Remove YouTube"
+                >
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               )}
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
