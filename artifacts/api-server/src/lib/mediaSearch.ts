@@ -36,6 +36,52 @@ function formatMs(ms: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Hardening limits for outbound calls and parsing of untrusted responses.
+const FETCH_TIMEOUT_MS = 8000;
+const MAX_HTML_BYTES = 4_000_000;
+const MAX_QUERY_LEN = 256;
+const MAX_TRAVERSAL_DEPTH = 80;
+const MAX_TRAVERSAL_NODES = 250_000;
+
+function clampQuery(query: string): string {
+  return query.trim().slice(0, MAX_QUERY_LEN);
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Reads a response body up to maxBytes, cancelling the stream once the cap is
+// reached so a very large external response cannot exhaust memory.
+async function readTextCapped(res: Response, maxBytes: number): Promise<string> {
+  const body = res.body;
+  if (!body) return await res.text();
+  const reader = body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    chunks.push(Buffer.from(value));
+    total += value.byteLength;
+    if (total >= maxBytes) {
+      await reader.cancel();
+      break;
+    }
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 // ---------------------------------------------------------------------------
 // YouTube — scraped from the public results page (no API key required), mirroring
 // the existing Ultimate Guitar approach. Returns an empty list on any failure.
@@ -67,12 +113,16 @@ function collectVideoRenderers(
   node: unknown,
   out: Record<string, unknown>[],
   limit: number,
+  state: { nodes: number },
+  depth: number,
 ): void {
   if (out.length >= limit) return;
+  if (depth > MAX_TRAVERSAL_DEPTH) return;
+  if (++state.nodes > MAX_TRAVERSAL_NODES) return;
   if (Array.isArray(node)) {
     for (const item of node) {
-      collectVideoRenderers(item, out, limit);
-      if (out.length >= limit) return;
+      collectVideoRenderers(item, out, limit, state, depth + 1);
+      if (out.length >= limit || state.nodes > MAX_TRAVERSAL_NODES) return;
     }
     return;
   }
@@ -82,8 +132,8 @@ function collectVideoRenderers(
   if (vr) out.push(vr);
   for (const key of Object.keys(rec)) {
     if (key === "videoRenderer") continue;
-    collectVideoRenderers(rec[key], out, limit);
-    if (out.length >= limit) return;
+    collectVideoRenderers(rec[key], out, limit, state, depth + 1);
+    if (out.length >= limit || state.nodes > MAX_TRAVERSAL_NODES) return;
   }
 }
 
@@ -104,8 +154,8 @@ function mapVideoRenderer(v: Record<string, unknown>): MediaSearchItem | null {
 
 export async function searchYouTube(query: string): Promise<MediaSearchResults> {
   try {
-    const res = await fetch(
-      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+    const res = await fetchWithTimeout(
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(clampQuery(query))}`,
       {
         headers: {
           "User-Agent":
@@ -115,7 +165,7 @@ export async function searchYouTube(query: string): Promise<MediaSearchResults> 
       },
     );
     if (!res.ok) return { results: [] };
-    const html = await res.text();
+    const html = await readTextCapped(res, MAX_HTML_BYTES);
     const marker = html.match(/ytInitialData["\]\s]*=\s*\{/);
     if (!marker || marker.index === undefined) return { results: [] };
     const braceStart = marker.index + marker[0].length - 1;
@@ -124,7 +174,7 @@ export async function searchYouTube(query: string): Promise<MediaSearchResults> 
     const data = JSON.parse(json) as unknown;
 
     const renderers: Record<string, unknown>[] = [];
-    collectVideoRenderers(data, renderers, 40);
+    collectVideoRenderers(data, renderers, 40, { nodes: 0 }, 0);
 
     const seen = new Set<string>();
     const results: MediaSearchItem[] = [];
@@ -165,7 +215,7 @@ async function getSpotifyToken(): Promise<string> {
     return spotifyToken.value;
   }
 
-  const res = await fetch("https://accounts.spotify.com/api/token", {
+  const res = await fetchWithTimeout("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -191,8 +241,8 @@ async function getSpotifyToken(): Promise<string> {
 export async function searchSpotify(query: string): Promise<MediaSearchResults> {
   try {
     const token = await getSpotifyToken();
-    const res = await fetch(
-      `https://api.spotify.com/v1/search?type=track&limit=15&q=${encodeURIComponent(query)}`,
+    const res = await fetchWithTimeout(
+      `https://api.spotify.com/v1/search?type=track&limit=15&q=${encodeURIComponent(clampQuery(query))}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!res.ok) return { results: [] };

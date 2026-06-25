@@ -28,5 +28,10 @@ Uploaded audio lives in private object storage and is served via `GET /api/stora
 
 **Why:** `<audio>`/`<video>` elements cannot attach an Authorization header, so a header-only guard would break playback; query-token auth was chosen over short-lived signed GET URLs to avoid an extra OpenAPI endpoint + codegen + async URL-refresh complexity. The Replit signed-URL sidecar only binds bucket/object/method/expires (not content-type/length), so PUT constraints must be validated at request-url issuance time.
 
+## Media search (Spotify / YouTube pickers)
+Spotify search uses the Web API **Client Credentials** flow (`SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET`, app-token, cached until expiry). When those secrets are absent the lib throws `SpotifyNotConfiguredError` and the route returns **HTTP 503 (ErrorEnvelope)** — the frontend detects `error.status === 503` to show a "not configured" setup prompt instead of an error. YouTube search is a **server-side HTML scrape** of the public results page (no key), parsing `ytInitialData` — same zero-setup, fragile-to-markup-change tradeoff as the UG scraper. Both live in `artifacts/api-server/src/lib/mediaSearch.ts`.
+
+**Why:** Spotify has no keyless search; Client Credentials avoids per-user OAuth since the app has no user accounts. The 503-vs-empty-results split lets the UI distinguish "needs setup" from "no matches". YouTube has no free official search API, so scraping mirrors the existing UG approach. Untrusted external HTML/JSON is parsed under hard caps (fetch timeout, response-size cap, recursion depth + node-count caps) to prevent a slow/huge/hostile response from exhausting an authenticated request — keep these caps when touching the scraper.
+
 ## Lib rebuild rule
 After changing `lib/db/src/schema/` or `lib/api-spec/openapi.yaml`, always run `pnpm run typecheck:libs` before checking leaf packages. Missing exports from `@workspace/db` are almost always stale declarations, not bad imports.
