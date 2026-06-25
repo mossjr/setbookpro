@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { HostMode, PresentState, SyncState } from '@workspace/gig-protocol';
 
 type DisplayMode = 'scroll' | 'split' | 'auto';
 
@@ -50,6 +51,13 @@ interface AppState {
   setLyricsOnly: (only: boolean) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
+  // Per-device PARTICIPANT overrides. Kept separate from the host-side `zoom`
+  // and `lyricsOnly` so a device that alternates roles never clobbers its own
+  // participant preferences with host settings.
+  participantZoom: number;
+  setParticipantZoom: (zoom: number) => void;
+  participantLyricsOnly: boolean;
+  setParticipantLyricsOnly: (only: boolean) => void;
   isSidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   desktopSidebarOpen: boolean;
@@ -160,6 +168,11 @@ export const useAppStore = create<AppState>()(
       setLyricsOnly: (lyricsOnly) => set({ lyricsOnly }),
       zoom: 1,
       setZoom: (zoom) => set({ zoom }),
+      participantZoom: 1,
+      setParticipantZoom: (participantZoom) => set({ participantZoom }),
+      participantLyricsOnly: false,
+      setParticipantLyricsOnly: (participantLyricsOnly) =>
+        set({ participantLyricsOnly }),
       isSidebarOpen: false,
       setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
       desktopSidebarOpen: true,
@@ -182,6 +195,8 @@ export const useAppStore = create<AppState>()(
         zoom: state.zoom, 
         displayMode: state.displayMode,
         lyricsOnly: state.lyricsOnly,
+        participantZoom: state.participantZoom,
+        participantLyricsOnly: state.participantLyricsOnly,
         desktopSidebarOpen: state.desktopSidebarOpen,
         activeSetId: state.activeSetId,
         lastPlayedSongId: state.lastPlayedSongId
@@ -189,3 +204,105 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
+
+// --- Live gig session (ephemeral; never persisted) -------------------------
+// Mirrors the server-authoritative HOST/PARTICIPANT state pushed over the
+// socket. Role is derived from whether *this* device owns the host slot.
+
+export type GigRole = 'idle' | 'host' | 'participant';
+
+export interface GigScrollCommand {
+  type: 'start' | 'stop' | 'seek';
+  fraction: number;
+  /** durationMs for 'start', remainingMs for 'seek', unused for 'stop'. */
+  ms: number;
+  /** Monotonic so an identical repeated command still re-fires its effect. */
+  seq: number;
+}
+
+interface GigState {
+  connected: boolean;
+  myId: string | null;
+  hostId: string | null;
+  role: GigRole;
+  hostSongId: string | null;
+  hostTranspose: number;
+  hostMode: HostMode;
+  scrollCmd: GigScrollCommand | null;
+  setConnected: (connected: boolean) => void;
+  setIdentity: (myId: string | null) => void;
+  applyHostChanged: (hostId: string | null) => void;
+  applyPresent: (present: PresentState) => void;
+  applySync: (snapshot: SyncState) => void;
+  pushScroll: (cmd: Omit<GigScrollCommand, 'seq'>) => void;
+  reset: () => void;
+}
+
+const roleFor = (hostId: string | null, myId: string | null): GigRole =>
+  hostId === null ? 'idle' : hostId === myId ? 'host' : 'participant';
+
+export const useGigStore = create<GigState>()((set) => ({
+  connected: false,
+  myId: null,
+  hostId: null,
+  role: 'idle',
+  hostSongId: null,
+  hostTranspose: 0,
+  hostMode: 'scroll',
+  scrollCmd: null,
+  setConnected: (connected) => set({ connected }),
+  setIdentity: (myId) => set((s) => ({ myId, role: roleFor(s.hostId, myId) })),
+  applyHostChanged: (hostId) =>
+    set((s) => ({ hostId, role: roleFor(hostId, s.myId) })),
+  applyPresent: (present) =>
+    set((s) => ({
+      hostSongId: present.songId,
+      hostTranspose: present.transpose,
+      hostMode: present.hostMode,
+      // A new presentation cancels any in-flight scroll everywhere. The fresh
+      // 'stop' (new seq) halts current followers and prevents a stale 'start'
+      // from replaying when the next song mounts; a real scroll_start re-arms.
+      scrollCmd: {
+        type: 'stop' as const,
+        fraction: 0,
+        ms: 0,
+        seq: (s.scrollCmd?.seq ?? 0) + 1,
+      },
+    })),
+  applySync: (snapshot) =>
+    set((s) => ({
+      hostId: snapshot.hostId,
+      role: roleFor(snapshot.hostId, s.myId),
+      hostSongId: snapshot.songId,
+      hostTranspose: snapshot.transpose,
+      hostMode: snapshot.hostMode,
+      scrollCmd: snapshot.scroll
+        ? {
+            type: 'start',
+            fraction: snapshot.scroll.fraction,
+            ms: snapshot.scroll.remainingMs,
+            seq: (s.scrollCmd?.seq ?? 0) + 1,
+          }
+        : {
+            // No active scroll in the snapshot: emit a fresh 'stop' so a
+            // reconnect that missed a present/scroll_stop can't replay a stale
+            // scroll command.
+            type: 'stop',
+            fraction: 0,
+            ms: 0,
+            seq: (s.scrollCmd?.seq ?? 0) + 1,
+          },
+    })),
+  pushScroll: (cmd) =>
+    set((s) => ({ scrollCmd: { ...cmd, seq: (s.scrollCmd?.seq ?? 0) + 1 } })),
+  reset: () =>
+    set({
+      connected: false,
+      hostId: null,
+      role: 'idle',
+      hostSongId: null,
+      hostTranspose: 0,
+      hostMode: 'scroll',
+      scrollCmd: null,
+    }),
+}));

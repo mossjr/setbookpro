@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useAppStore, useSettingsStore } from "@/store";
+import { useAppStore, useGigStore, useSettingsStore } from "@/store";
 
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
@@ -12,6 +12,7 @@ import Home from "@/pages/Home";
 import ImportTab from "@/pages/Import";
 import SetView from "@/pages/Set";
 import Layout from "@/components/Layout";
+import GigProvider from "@/components/GigProvider";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
+  const role = useGigStore((s) => s.role);
+
+  // Participants are music-view only: pin them to the host's song no matter what
+  // URL they're on (or navigate to). Home handles the host-song / waiting view.
+  if (role === "participant") {
+    return <Home />;
+  }
+
   return (
     <Switch>
       <Route path="/" component={Home} />
@@ -92,11 +101,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthGuard>
-          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
-            <Layout>
-              <Router />
-            </Layout>
-          </WouterRouter>
+          <GigProvider>
+            <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+              <Layout>
+                <Router />
+              </Layout>
+            </WouterRouter>
+          </GigProvider>
         </AuthGuard>
         <Toaster />
       </TooltipProvider>

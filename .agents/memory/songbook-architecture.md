@@ -54,5 +54,12 @@ The scrubber is a circular handle on a track: dead-center = the user's **base** 
 
 **Why:** Songs need different stage tempos; per-song client-side persistence avoids a DB round-trip. Center=base lets the player nudge around a sensible default instead of from zero.
 
+## Gig live-sync (HOST/PARTICIPANT)
+One server-authoritative **single global session** (no rooms): newest `claim_host` wins and demotes the prior host; late joiners get a full `sync_state` snapshot on connect. Role is derived purely from `hostId === myId` (host) / `hostId === null` (idle) / else participant. Scroll is synced as **fraction + remainingMs**, never pixel positions — each follower re-derives its own px/s every frame (`useAutoScroll` follow mode) so devices with different fonts/zoom land at the bottom at the same wall-clock time. Participant lock-down is enforced at the **router** level (App.tsx returns `<Home/>` whenever role is participant) — Home/Layout hiding alone is not enough because a participant could already be on `/import` or `/sets/:id`.
+
+**Why:** One band shares one password ⇒ one implicit session; rooms would add UI with no product value. Fraction/time sync (not pixels) is the only way heterogeneous devices stay in lockstep.
+
+**How to apply — scroll-cancel invariant (this caused a multi-round bug):** ANY change to what the host presents must cancel in-flight scroll on BOTH server and every client. Server nulls `scroll` on `host_present`/`claim_host`; the client `applyPresent` AND the null-scroll branch of `applySync` must each push a fresh `stop` `scrollCmd` with a **new monotonic `seq`** (the seq is what makes a repeated/identical command re-fire its effect). Skipping the client-side stop lets a stale `start` replay when the next host song mounts, and lets a host demoted on the same song keep auto-scrolling. If you add any new event that changes the presented song/mode, reset `scrollCmd` the same way. (Note: this also cancels scroll on transpose-only presents — accepted tradeoff; the next host `scroll_seek` re-anchors within ~1.2s.) Socket.io auth: every socket must present the same JWT as REST via `io.use` + `verifyToken`; `SESSION_SECRET`/`APP_PASSWORD` now fail-fast at startup (no public-default fallback).
+
 ## Lib rebuild rule
 After changing `lib/db/src/schema/` or `lib/api-spec/openapi.yaml`, always run `pnpm run typecheck:libs` before checking leaf packages. Missing exports from `@workspace/db` are almost always stale declarations, not bad imports.

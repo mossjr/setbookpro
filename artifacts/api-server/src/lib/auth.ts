@@ -1,8 +1,24 @@
 import jwt from "jsonwebtoken";
 import { type Request, type Response, type NextFunction } from "express";
 
-const JWT_SECRET = process.env.SESSION_SECRET ?? "songbook-secret";
-const APP_PASSWORD = process.env.APP_PASSWORD ?? "";
+function requireEnv(name: string, why: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required: ${why}`);
+  }
+  return value;
+}
+
+// Fail fast rather than fall back to a public default — a guessable JWT secret
+// makes both REST and Socket.io auth forgeable.
+const JWT_SECRET = requireEnv(
+  "SESSION_SECRET",
+  "without it JWTs are forgeable and socket/REST auth can be bypassed",
+);
+const APP_PASSWORD = requireEnv(
+  "APP_PASSWORD",
+  "it is the single password gating login for the whole app",
+);
 
 export function signToken(): string {
   return jwt.sign({ auth: true }, JWT_SECRET, { expiresIn: "30d" });

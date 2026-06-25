@@ -1,16 +1,23 @@
-import { io, Socket } from "socket.io-client";
-import { useAppStore } from "@/store";
+import { io, type Socket } from "socket.io-client";
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from "@workspace/gig-protocol";
 
-let socket: Socket | null = null;
+export type GigSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-export const getSocket = () => {
+let socket: GigSocket | null = null;
+
+export const getSocket = (): GigSocket => {
   if (!socket) {
     socket = io("/", {
       path: "/ws/socket.io",
       transports: ["websocket", "polling"],
-      auth: {
-        token: localStorage.getItem("songbook_token")
-      }
+      autoConnect: false,
+      // Function form so the *current* token is read on every (re)connect,
+      // not just when the singleton was first created.
+      auth: (cb) =>
+        cb({ token: localStorage.getItem("songbook_token") ?? "" }),
     });
   }
   return socket;

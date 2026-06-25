@@ -5,7 +5,15 @@ import {
   useGetSet,
   getGetSetQueryKey,
 } from "@workspace/api-client-react";
-import { useAppStore, useSettingsStore } from "@/store";
+import { useAppStore, useSettingsStore, useGigStore } from "@/store";
+import {
+  claimHost,
+  releaseHost,
+  hostPresent,
+  hostScrollStart,
+  hostScrollSeek,
+  hostScrollStop,
+} from "@/lib/gig";
 import ChordRenderer from "./ChordRenderer";
 import Metronome from "./Metronome";
 import MediaPlayerModal from "./MediaPlayerModal";
@@ -14,6 +22,7 @@ import SettingsDialog from "./SettingsDialog";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 import { useSongViewLayout, EDGE } from "@/hooks/useSongViewLayout";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { usePinchZoom } from "@/hooks/usePinchZoom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { resolveAudioUrl } from "@/lib/media";
@@ -35,6 +44,7 @@ import {
   SkipBack,
   SkipForward,
   Star,
+  Radio,
 } from "lucide-react";
 
 // Horizontal safe zones so song content never renders under floating overlays.
@@ -56,6 +66,10 @@ export default function SongView({ songId }: { songId: string }) {
     setDisplayMode,
     lyricsOnly,
     setLyricsOnly,
+    participantZoom,
+    setParticipantZoom,
+    participantLyricsOnly,
+    setParticipantLyricsOnly,
     setSidebarOpen,
     desktopSidebarOpen,
     setDesktopSidebarOpen,
@@ -68,6 +82,27 @@ export default function SongView({ songId }: { songId: string }) {
   const { titleFontSize, lyricsFontSize, chordsFontSize, accentColor } =
     useSettingsStore();
 
+  // --- Live gig role ------------------------------------------------------
+  const role = useGigStore((s) => s.role);
+  const hostTranspose = useGigStore((s) => s.hostTranspose);
+  const hostMode = useGigStore((s) => s.hostMode);
+  const scrollCmd = useGigStore((s) => s.scrollCmd);
+  const isHost = role === "host";
+  const isParticipant = role === "participant";
+  // Participants follow the host's scroll when both are in scroll mode; when the
+  // host is paging they get their own auxiliary scroll controls instead.
+  const participantFollows = isParticipant && hostMode === "scroll";
+
+  // Participants mirror the host's transpose; everyone else controls their own.
+  // Zoom and lyrics-only are always per-device, but participants keep a separate
+  // persisted set so toggling roles never clobbers their own preferences.
+  const userZoom = isParticipant ? participantZoom : zoom;
+  const applyZoom = isParticipant ? setParticipantZoom : setZoom;
+  const effectiveLyricsOnly = isParticipant ? participantLyricsOnly : lyricsOnly;
+  const applyLyricsOnly = isParticipant
+    ? setParticipantLyricsOnly
+    : setLyricsOnly;
+
   // Active set (for in-header Prev/Next navigation). Called before any early
   // return to keep hook order stable; shares cache with the Sidebar via key.
   const { data: activeSet } = useGetSet(activeSetId ?? "", {
@@ -78,6 +113,8 @@ export default function SongView({ songId }: { songId: string }) {
   });
 
   const [transpose, setTranspose] = useState(0);
+  // Participants render at the host's transpose; everyone else uses their own.
+  const effectiveTranspose = isParticipant ? hostTranspose : transpose;
   const [mediaOpen, setMediaOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -86,6 +123,10 @@ export default function SongView({ songId }: { songId: string }) {
   // Live-scaled during a pinch gesture; reflows on release.
   const scrollContentRef = useRef<HTMLDivElement>(null);
   const splitStageRef = useRef<HTMLDivElement>(null);
+
+  // Single auto-scroll engine for this view; shared by the scrubber (host /
+  // solo / aux) and by participant follow-mode.
+  const scroller = useAutoScroll(scrollRef);
 
   const pressTimer = useRef<number | null>(null);
   const longPressed = useRef(false);
@@ -124,15 +165,15 @@ export default function SongView({ songId }: { songId: string }) {
   // Layout hook is called BEFORE any early return to keep hook order stable.
   const layout = useSongViewLayout({
     displayMode,
-    userZoom: zoom,
-    lyricsOnly,
+    userZoom,
+    lyricsOnly: effectiveLyricsOnly,
     lyricsFontSize,
     frameRef,
     pagerRef,
     measureRef,
     safeLeft,
     safeRight,
-    recomputeKey: `${song?.id ?? ""}|${transpose}|${lyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}|${zoom}|${displayMode}`,
+    recomputeKey: `${song?.id ?? ""}|${effectiveTranspose}|${effectiveLyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}|${userZoom}|${displayMode}`,
   });
 
   const isSplit = layout.effectiveMode === "split";
@@ -143,8 +184,8 @@ export default function SongView({ songId }: { songId: string }) {
     frameRef,
     enabled: !!song,
     getStage: () => (isSplit ? splitStageRef.current : scrollContentRef.current),
-    getZoom: () => zoom,
-    setZoom,
+    getZoom: () => userZoom,
+    setZoom: applyZoom,
     min: 0.5,
     max: 3,
   });
@@ -159,6 +200,39 @@ export default function SongView({ songId }: { songId: string }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isSplit, nextPage, prevPage]);
+
+  // HOST: broadcast what we're presenting so participants mirror song,
+  // transpose, and scroll-vs-page mode.
+  useEffect(() => {
+    if (!isHost || !song) return;
+    hostPresent({
+      songId: song.id,
+      transpose,
+      hostMode: isSplit ? "page" : "scroll",
+    });
+  }, [isHost, song?.id, transpose, isSplit]);
+
+  // PARTICIPANT (scroll-follow): apply the host's scroll commands. The engine
+  // re-derives speed so this device lands at the bottom at the same time as the
+  // host regardless of its own font size / pixel height.
+  useEffect(() => {
+    if (!participantFollows || isSplit || !scrollCmd) return;
+    if (scrollCmd.type === "start") {
+      scroller.startFollow(scrollCmd.fraction, scrollCmd.ms);
+    } else if (scrollCmd.type === "seek") {
+      scroller.seekFollow(scrollCmd.fraction, scrollCmd.ms);
+    } else {
+      scroller.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollCmd?.seq, participantFollows, isSplit]);
+
+  // Halt the engine whenever follow no longer applies (host starts paging, this
+  // device switches to split, role changes) so no orphaned scroll keeps running.
+  useEffect(() => {
+    if (!participantFollows || isSplit) scroller.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participantFollows, isSplit]);
 
   if (isLoading)
     return (
@@ -264,6 +338,19 @@ export default function SongView({ songId }: { songId: string }) {
   const toggleBookmark = () =>
     setLastPlayedSongId(isBookmarked ? null : song.id);
 
+  // Claiming demotes any current host (newest-claim-wins, enforced server-side).
+  const toggleHost = () => {
+    if (isHost) {
+      releaseHost();
+    } else {
+      claimHost({
+        songId: song.id,
+        transpose,
+        hostMode: isSplit ? "page" : "scroll",
+      });
+    }
+  };
+
   const cycleMode = () =>
     setDisplayMode(
       displayMode === "scroll"
@@ -282,9 +369,10 @@ export default function SongView({ songId }: { songId: string }) {
       <Wand2 className="w-5 h-5" />
     );
 
-  const zoomIn = () => setZoom(Math.min(3, Math.round((zoom + 0.1) * 100) / 100));
+  const zoomIn = () =>
+    applyZoom(Math.min(3, Math.round((userZoom + 0.1) * 100) / 100));
   const zoomOut = () =>
-    setZoom(Math.max(0.5, Math.round((zoom - 0.1) * 100) / 100));
+    applyZoom(Math.max(0.5, Math.round((userZoom - 0.1) * 100) / 100));
 
   // Zoom out until the whole song fits vertically (scroll mode only). Content
   // height scales with zoom, but fixed margins make it non-linear, so we
@@ -303,7 +391,7 @@ export default function SongView({ songId }: { songId: string }) {
       if (!Number.isFinite(ratio) || ratio <= 0) return;
       const next = Math.max(0.5, Math.floor(current * ratio * 100) / 100);
       if (next >= current) return; // at min zoom
-      setZoom(next);
+      applyZoom(next);
       if (passesLeft > 0) requestAnimationFrame(() => run(passesLeft - 1));
     };
     run(3);
@@ -311,20 +399,26 @@ export default function SongView({ songId }: { songId: string }) {
 
   const translate = -pageIndex * layout.pageWidth;
 
+  // Participants in scroll-follow mode have no manual scrubber; the host (and
+  // solo/idle users, and participants when the host is paging) keep one.
+  const showScrubber = !isSplit && !participantFollows;
+
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Top Bar */}
       <header className="flex items-center justify-between p-2 border-b border-border bg-card shadow-sm z-10 shrink-0">
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden"
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-          {inActiveSet && (
+          {!isParticipant && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+          )}
+          {!isParticipant && inActiveSet && (
             <div className="flex items-center">
               <Button
                 variant="ghost"
@@ -364,28 +458,30 @@ export default function SongView({ songId }: { songId: string }) {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Transpose */}
-          <div className="flex items-center bg-muted rounded-md overflow-hidden mr-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-none"
-              onClick={() => setTranspose((t) => t - 1)}
-            >
-              <span className="font-bold">♭</span>
-            </Button>
-            <div className="w-8 text-center text-sm font-medium">
-              {transpose > 0 ? `+${transpose}` : transpose}
+          {/* Transpose — host/solo only; participants follow the host's key. */}
+          {!isParticipant && (
+            <div className="flex items-center bg-muted rounded-md overflow-hidden mr-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-none"
+                onClick={() => setTranspose((t) => t - 1)}
+              >
+                <span className="font-bold">♭</span>
+              </Button>
+              <div className="w-8 text-center text-sm font-medium">
+                {transpose > 0 ? `+${transpose}` : transpose}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-none"
+                onClick={() => setTranspose((t) => t + 1)}
+              >
+                <span className="font-bold">♯</span>
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-none"
-              onClick={() => setTranspose((t) => t + 1)}
-            >
-              <span className="font-bold">♯</span>
-            </Button>
-          </div>
+          )}
 
           <Button
             variant="ghost"
@@ -399,23 +495,38 @@ export default function SongView({ songId }: { songId: string }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setLyricsOnly(!lyricsOnly)}
+            onClick={() => applyLyricsOnly(!effectiveLyricsOnly)}
             title="Lyrics Only"
           >
             <Eye
-              className={`w-5 h-5 ${lyricsOnly ? "text-primary" : "text-muted-foreground"}`}
+              className={`w-5 h-5 ${effectiveLyricsOnly ? "text-primary" : "text-muted-foreground"}`}
             />
           </Button>
+
+          {!isParticipant && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleBookmark}
+              title={isBookmarked ? "Clear Last Played" : "Mark as Last Played"}
+              aria-label="Last Played"
+            >
+              <Star
+                className={`w-5 h-5 ${isBookmarked ? "text-primary fill-primary" : "text-muted-foreground"}`}
+              />
+            </Button>
+          )}
 
           <Button
             variant="ghost"
             size="icon"
-            onClick={toggleBookmark}
-            title={isBookmarked ? "Clear Last Played" : "Mark as Last Played"}
-            aria-label="Last Played"
+            onClick={toggleHost}
+            title={isHost ? "Stop hosting" : "Host this session"}
+            aria-label={isHost ? "Stop hosting" : "Host this session"}
+            aria-pressed={isHost}
           >
-            <Star
-              className={`w-5 h-5 ${isBookmarked ? "text-primary fill-primary" : "text-muted-foreground"}`}
+            <Radio
+              className={`w-5 h-5 ${isHost ? "text-primary" : "text-muted-foreground"}`}
             />
           </Button>
 
@@ -423,9 +534,33 @@ export default function SongView({ songId }: { songId: string }) {
         </div>
       </header>
 
+      {isParticipant && (
+        <div className="flex items-center justify-center gap-2 bg-primary/10 text-primary text-xs font-medium py-1.5 px-3 shrink-0 border-b border-border">
+          <Radio className="w-3.5 h-3.5" />
+          {hostMode === "scroll"
+            ? "Following host"
+            : "Following host — scroll on your own"}
+        </div>
+      )}
+
       {/* Auto-scroll scrubber — pinned to the top to keep clear of the
-          bottom-edge app-switcher gesture; only used in scroll mode. */}
-      {!isSplit && <ScrollScrubber scrollRef={scrollRef} songId={song.id} />}
+          bottom-edge app-switcher gesture; only used in scroll mode. The host
+          broadcasts its scroll; idle/aux usage stays local to the device. */}
+      {showScrubber && (
+        <ScrollScrubber
+          scroller={scroller}
+          songId={song.id}
+          {...(isHost
+            ? {
+                onHostStart: (fraction, durationMs) =>
+                  hostScrollStart({ fraction, durationMs }),
+                onHostSeek: (fraction, remainingMs) =>
+                  hostScrollSeek({ fraction, remainingMs }),
+                onHostStop: (fraction) => hostScrollStop(fraction),
+              }
+            : {})}
+        />
+      )}
 
       {/* Song Body — a stable measured frame that hosts either the scroll
           viewport or the paginated split pager. Tapping the song collapses the
@@ -473,8 +608,8 @@ export default function SongView({ songId }: { songId: string }) {
                 <ChordRenderer
                   text={song.lyricsChords}
                   zoom={layout.effectiveZoom}
-                  transpose={transpose}
-                  lyricsOnly={lyricsOnly}
+                  transpose={effectiveTranspose}
+                  lyricsOnly={effectiveLyricsOnly}
                   lyricsFontSize={lyricsFontSize}
                   chordsFontSize={chordsFontSize}
                   accentColor={accentColor}
@@ -526,8 +661,8 @@ export default function SongView({ songId }: { songId: string }) {
               <ChordRenderer
                 text={song.lyricsChords}
                 zoom={layout.effectiveZoom}
-                transpose={transpose}
-                lyricsOnly={lyricsOnly}
+                transpose={effectiveTranspose}
+                lyricsOnly={effectiveLyricsOnly}
                 lyricsFontSize={lyricsFontSize}
                 chordsFontSize={chordsFontSize}
                 accentColor={accentColor}
@@ -539,7 +674,7 @@ export default function SongView({ songId }: { songId: string }) {
 
       {/* Hidden measurer: a zoom-1 mirror of the song used purely to measure the
           widest chord line for the width-safe zoom clamp. Never shown. */}
-      {!lyricsOnly && (
+      {!effectiveLyricsOnly && (
         <div
           ref={measureRef}
           aria-hidden
@@ -557,8 +692,8 @@ export default function SongView({ songId }: { songId: string }) {
           <ChordRenderer
             text={song.lyricsChords}
             zoom={1}
-            transpose={transpose}
-            lyricsOnly={lyricsOnly}
+            transpose={effectiveTranspose}
+            lyricsOnly={effectiveLyricsOnly}
             lyricsFontSize={lyricsFontSize}
             chordsFontSize={chordsFontSize}
             accentColor={accentColor}

@@ -3,18 +3,25 @@ import {
   useState,
   useEffect,
   useCallback,
-  type RefObject,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useSettingsStore } from "@/store";
+import type { AutoScroll } from "@/hooks/useAutoScroll";
 import { Play, Pause } from "lucide-react";
 
 interface ScrollScrubberProps {
-  scrollRef: RefObject<HTMLDivElement | null>;
+  /** Shared scroll engine owned by SongView. */
+  scroller: AutoScroll;
   songId: string;
+  // Host-only broadcasters. When provided, local scroll actions are mirrored
+  // to participants. Omitted for solo or auxiliary (participant) scrolling.
+  onHostStart?: (fraction: number, durationMs: number) => void;
+  onHostSeek?: (fraction: number, remainingMs: number) => void;
+  onHostStop?: (fraction: number) => void;
 }
 
 const DRAG_THRESHOLD = 5;
+const SEEK_INTERVAL_MS = 1200;
 
 /** Speed (px/s) → handle position 0..1, with the base speed pinned dead-center. */
 function speedToPos(speed: number, min: number, base: number, max: number) {
@@ -33,8 +40,11 @@ function posToSpeed(pos: number, min: number, base: number, max: number) {
 }
 
 export default function ScrollScrubber({
-  scrollRef,
+  scroller,
   songId,
+  onHostStart,
+  onHostSeek,
+  onHostStop,
 }: ScrollScrubberProps) {
   const {
     autoScrollSpeed,
@@ -54,17 +64,13 @@ export default function ScrollScrubber({
     Math.max(min, songScrollSpeeds[songId] ?? base),
   );
 
-  const [isScrolling, setIsScrolling] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
-  const rafRef = useRef<number | null>(null);
-  const lastTsRef = useRef<number>(0);
-  // Float accumulator for the scroll position. The browser rounds `scrollTop`
-  // to (sub)pixels, so at slow speeds the <1px per-frame delta would be lost if
-  // we read it back each frame — the scroll would stall. We keep the true
-  // position here and write it out, so even a 2px/s crawl advances smoothly.
-  const posRef = useRef<number | null>(null);
-  const speedRef = useRef(currentSpeed);
+  const speedValRef = useRef(currentSpeed);
+  useEffect(() => {
+    speedValRef.current = currentSpeed;
+  }, [currentSpeed]);
+
   const delayTimerRef = useRef<number | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ startX: number; dragging: boolean }>({
@@ -72,51 +78,13 @@ export default function ScrollScrubber({
     dragging: false,
   });
 
-  useEffect(() => {
-    speedRef.current = currentSpeed;
-  }, [currentSpeed]);
-
+  const isScrolling = scroller.isScrolling;
   const pos = speedToPos(currentSpeed, min, base, max);
   const multiplier = base > 0 ? currentSpeed / base : 1;
 
-  const stop = useCallback(() => {
-    setIsScrolling(false);
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-    lastTsRef.current = 0;
-    posRef.current = null;
-  }, []);
-
-  const step = useCallback(
-    (ts: number) => {
-      const el = scrollRef.current;
-      if (!el) {
-        rafRef.current = requestAnimationFrame(step);
-        return;
-      }
-      if (!lastTsRef.current) lastTsRef.current = ts;
-      // Seed the accumulator from the live position (covers manual scrolling
-      // before/while starting), then advance it ourselves frame to frame.
-      if (posRef.current === null) posRef.current = el.scrollTop;
-      const dt = (ts - lastTsRef.current) / 1000;
-      lastTsRef.current = ts;
-      posRef.current += speedRef.current * dt;
-      el.scrollTop = posRef.current;
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
-        stop();
-        return;
-      }
-      rafRef.current = requestAnimationFrame(step);
-    },
-    [scrollRef, stop],
-  );
-
   const begin = useCallback(() => {
-    setIsScrolling(true);
-    lastTsRef.current = 0;
-    posRef.current = null;
-    rafRef.current = requestAnimationFrame(step);
-  }, [step]);
+    scroller.startSpeed(speedValRef.current);
+  }, [scroller]);
 
   const start = useCallback(() => {
     if (autoScrollStartDelay > 0) {
@@ -143,15 +111,43 @@ export default function ScrollScrubber({
         delayTimerRef.current = null;
       }
       setCountdown(0);
-      stop();
+      scroller.stop();
     } else {
       start();
     }
-  }, [isScrolling, countdown, start, stop]);
+  }, [isScrolling, countdown, start, scroller]);
+
+  // Broadcast host start/stop on the engine's running edge. This covers every
+  // stop path — manual toggle and auto-stop at the bottom — with one source.
+  const prevScrollingRef = useRef(false);
+  useEffect(() => {
+    const was = prevScrollingRef.current;
+    prevScrollingRef.current = isScrolling;
+    if (isScrolling && !was) {
+      const m = scroller.metrics();
+      if (onHostStart && m.max > 0 && speedValRef.current > 0) {
+        const durationMs = ((m.max - m.scrollTop) / speedValRef.current) * 1000;
+        onHostStart(m.fraction, durationMs);
+      }
+    } else if (!isScrolling && was) {
+      onHostStop?.(scroller.metrics().fraction);
+    }
+  }, [isScrolling, scroller, onHostStart, onHostStop]);
+
+  // Periodic drift-correction seek while hosting a scroll.
+  useEffect(() => {
+    if (!isScrolling || !onHostSeek) return;
+    const id = window.setInterval(() => {
+      const m = scroller.metrics();
+      if (m.max <= 0 || speedValRef.current <= 0) return;
+      const remainingMs = ((m.max - m.scrollTop) / speedValRef.current) * 1000;
+      onHostSeek(m.fraction, remainingMs);
+    }, SEEK_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isScrolling, onHostSeek, scroller]);
 
   useEffect(() => {
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (delayTimerRef.current) clearInterval(delayTimerRef.current);
     };
   }, []);
@@ -162,8 +158,9 @@ export default function ScrollScrubber({
     const rect = track.getBoundingClientRect();
     const ratio = (clientX - rect.left) / rect.width;
     const next = posToSpeed(ratio, min, base, max);
-    speedRef.current = next;
+    speedValRef.current = next;
     setSongScrollSpeed(songId, next);
+    if (isScrolling) scroller.setSpeed(next);
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
