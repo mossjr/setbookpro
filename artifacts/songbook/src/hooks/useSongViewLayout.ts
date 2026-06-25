@@ -42,6 +42,11 @@ interface Options {
   measureRef: RefObject<HTMLDivElement | null>;
   /** Any change here (song/transpose/font/zoom/mode) triggers a reflow. */
   recomputeKey: string;
+  /** Horizontal safe-zone insets (px) reserved for overlay UI on each side, so
+   *  content never renders under the reveal tab (left) or floating controls
+   *  (right). Added to EDGE in both the CSS padding and this width math. */
+  safeLeft?: number;
+  safeRight?: number;
 }
 
 interface Layout {
@@ -80,6 +85,8 @@ export function useSongViewLayout({
   pagerRef,
   measureRef,
   recomputeKey,
+  safeLeft = 0,
+  safeRight = 0,
 }: Options): Result {
   const [layout, setLayout] = useState<Layout>({
     effectiveMode: displayMode === "split" ? "split" : "scroll",
@@ -96,7 +103,7 @@ export function useSongViewLayout({
     const frame = frameRef.current;
     if (!frame) return;
 
-    const availW = frame.clientWidth - 2 * EDGE;
+    const availW = frame.clientWidth - 2 * EDGE - safeLeft - safeRight;
     const availH = frame.clientHeight - 2 * EDGE;
     if (availW <= 0 || availH <= 0) return;
 
@@ -150,7 +157,16 @@ export function useSongViewLayout({
       columnsPerPage: colsPerPage,
       pageWidth: availW + GAP,
     });
-  }, [frameRef, measureRef, displayMode, userZoom, lyricsOnly, lyricsFontSize]);
+  }, [
+    frameRef,
+    measureRef,
+    displayMode,
+    userZoom,
+    lyricsOnly,
+    lyricsFontSize,
+    safeLeft,
+    safeRight,
+  ]);
 
   // Reflow when content/zoom/mode/font changes; reset to the first page.
   useLayoutEffect(() => {

@@ -10,6 +10,7 @@ import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
 import { useSongViewLayout, EDGE } from "@/hooks/useSongViewLayout";
 import { usePinchZoom } from "@/hooks/usePinchZoom";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { resolveAudioUrl } from "@/lib/media";
 import { parseYouTubeId } from "@/lib/youtube";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,13 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+
+// Horizontal safe zones so song content never renders under floating overlays.
+// Left clears the collapsed-sidebar reveal tab (Layout.tsx, w-7 ≈ 28px); only
+// reserved while the desktop sidebar is collapsed (the tab is hidden otherwise).
+// Right clears the floating control stack (media FAB w-14 = 56px + edge offset).
+const SAFE_LEFT = 24;
+const SAFE_RIGHT = 72;
 
 export default function SongView({ songId }: { songId: string }) {
   const { data: song, isLoading } = useGetSong(songId, {
@@ -84,6 +92,14 @@ export default function SongView({ songId }: { songId: string }) {
   const ytWrapperRef = useRef<HTMLDivElement>(null);
   const yt = useYouTubePlayer(ytWrapperRef, youtubeVideoId);
 
+  // Reserve the left safe zone only on desktop while the reveal tab is showing
+  // (the tab is `hidden md:flex`, so it never appears on mobile — and a collapsed
+  // state can persist from a desktop session). The right zone is always reserved
+  // for the floating controls.
+  const isMobile = useIsMobile();
+  const safeLeft = !isMobile && !desktopSidebarOpen ? SAFE_LEFT : 0;
+  const safeRight = SAFE_RIGHT;
+
   // Layout hook is called BEFORE any early return to keep hook order stable.
   const layout = useSongViewLayout({
     displayMode,
@@ -93,6 +109,8 @@ export default function SongView({ songId }: { songId: string }) {
     frameRef,
     pagerRef,
     measureRef,
+    safeLeft,
+    safeRight,
     recomputeKey: `${song?.id ?? ""}|${transpose}|${lyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}|${zoom}|${displayMode}`,
   });
 
@@ -344,7 +362,15 @@ export default function SongView({ songId }: { songId: string }) {
         }}
       >
         {isSplit ? (
-          <div className="absolute inset-0" style={{ padding: EDGE }}>
+          <div
+            className="absolute inset-0"
+            style={{
+              paddingTop: EDGE,
+              paddingBottom: EDGE,
+              paddingLeft: EDGE + safeLeft,
+              paddingRight: EDGE + safeRight,
+            }}
+          >
             <div
               ref={splitStageRef}
               className="relative w-full h-full overflow-hidden"
@@ -406,7 +432,12 @@ export default function SongView({ songId }: { songId: string }) {
           <div
             ref={scrollRef}
             className="absolute inset-0 overflow-x-hidden overflow-y-auto"
-            style={{ padding: EDGE }}
+            style={{
+              paddingTop: EDGE,
+              paddingBottom: EDGE,
+              paddingLeft: EDGE + safeLeft,
+              paddingRight: EDGE + safeRight,
+            }}
           >
             <div ref={scrollContentRef}>
               <ChordRenderer
