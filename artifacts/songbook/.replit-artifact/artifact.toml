@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SongBook"
+version = "1.0.0"
+id = "artifacts/songbook"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21003
+
+[services.development]
+run = "pnpm --filter @workspace/songbook run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/songbook", "run", "build" ]
+publicDir = "artifacts/songbook/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21003"
+BASE_PATH = "/"

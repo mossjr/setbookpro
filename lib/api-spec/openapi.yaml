@@ -3,20 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SongBook API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: songs
+    description: Song library operations
+  - name: tags
+    description: Tag operations
+  - name: sets
+    description: Set operations
+  - name: ug
+    description: Ultimate Guitar integration
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,523 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with app password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Invalid password
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Check auth status
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Not authenticated
+
+  /songs:
+    get:
+      operationId: listSongs
+      tags: [songs]
+      summary: List all songs with optional filtering
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: tagId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of songs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Song"
+    post:
+      operationId: createSong
+      tags: [songs]
+      summary: Create a new song
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SongInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+
+  /songs/stats:
+    get:
+      operationId: getSongStats
+      tags: [songs]
+      summary: Get library stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LibraryStats"
+
+  /songs/{id}:
+    get:
+      operationId: getSong
+      tags: [songs]
+      summary: Get a song by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Song
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSong
+      tags: [songs]
+      summary: Update a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SongUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSong
+      tags: [songs]
+      summary: Delete a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /songs/{id}/tags:
+    post:
+      operationId: addTagToSong
+      tags: [songs]
+      summary: Add a tag to a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagAssignment"
+      responses:
+        "200":
+          description: Updated song
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+
+  /songs/{id}/tags/{tagId}:
+    delete:
+      operationId: removeTagFromSong
+      tags: [songs]
+      summary: Remove a tag from a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated song
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+
+  /tags:
+    get:
+      operationId: listTags
+      tags: [tags]
+      summary: List all tags
+      responses:
+        "200":
+          description: Tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tag"
+    post:
+      operationId: createTag
+      tags: [tags]
+      summary: Create a tag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tag"
+
+  /tags/{id}:
+    patch:
+      operationId: updateTag
+      tags: [tags]
+      summary: Update a tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tag"
+    delete:
+      operationId: deleteTag
+      tags: [tags]
+      summary: Delete a tag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /sets:
+    get:
+      operationId: listSets
+      tags: [sets]
+      summary: List all sets
+      responses:
+        "200":
+          description: Sets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SongSet"
+    post:
+      operationId: createSet
+      tags: [sets]
+      summary: Create a set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SongSetInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongSet"
+
+  /sets/{id}:
+    get:
+      operationId: getSet
+      tags: [sets]
+      summary: Get a set with its songs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Set with songs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongSetDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSet
+      tags: [sets]
+      summary: Update a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SongSetUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongSet"
+    delete:
+      operationId: deleteSet
+      tags: [sets]
+      summary: Delete a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /sets/{id}/songs:
+    post:
+      operationId: addSongToSet
+      tags: [sets]
+      summary: Add a song to a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSongAdd"
+      responses:
+        "200":
+          description: Updated set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongSetDetail"
+
+  /sets/{id}/songs/{songId}:
+    delete:
+      operationId: removeSongFromSet
+      tags: [sets]
+      summary: Remove a song from a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: songId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongSetDetail"
+
+  /sets/{id}/reorder:
+    patch:
+      operationId: reorderSetSongs
+      tags: [sets]
+      summary: Reorder songs in a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetReorder"
+      responses:
+        "200":
+          description: Updated set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SongSetDetail"
+
+  /ug/search:
+    get:
+      operationId: ugSearch
+      tags: [ug]
+      summary: Search Ultimate Guitar
+      parameters:
+        - name: title
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UgSearchResults"
+
+  /ug/explore:
+    get:
+      operationId: ugExplore
+      tags: [ug]
+      summary: Explore popular tabs on UG
+      responses:
+        "200":
+          description: Popular tabs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UgSearchResults"
+
+  /ug/tab/{id}:
+    get:
+      operationId: ugGetTab
+      tags: [ug]
+      summary: Get a specific UG tab
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tab detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UgTab"
+
+  /ug/import:
+    post:
+      operationId: ugImportTab
+      tags: [ug]
+      summary: Import a UG tab into the song library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UgImportInput"
+      responses:
+        "201":
+          description: Imported song
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +560,264 @@ components:
       required:
         - status
 
+    SuccessResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    LoginInput:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+
+    AuthResult:
+      type: object
+      required: [authenticated]
+      properties:
+        authenticated:
+          type: boolean
+        token:
+          type: ["string", "null"]
+
+    Tag:
+      type: object
+      required: [id, name, color]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+
+    TagInput:
+      type: object
+      required: [name, color]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+
+    TagUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+
+    TagAssignment:
+      type: object
+      required: [tagId]
+      properties:
+        tagId:
+          type: string
+
+    Song:
+      type: object
+      required: [id, title, artist, lyricsChords, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        meta:
+          type: ["string", "null"]
+        lyricsChords:
+          type: string
+        originalUgId:
+          type: ["string", "null"]
+        spotifyLink:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+
+    SongInput:
+      type: object
+      required: [title, artist, lyricsChords]
+      properties:
+        title:
+          type: string
+        artist:
+          type: string
+        meta:
+          type: string
+        lyricsChords:
+          type: string
+        spotifyLink:
+          type: string
+
+    SongUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        artist:
+          type: string
+        meta:
+          type: string
+        lyricsChords:
+          type: string
+        spotifyLink:
+          type: ["string", "null"]
+
+    SongSet:
+      type: object
+      required: [id, title, createdAt, songCount]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+        songCount:
+          type: integer
+
+    SongSetInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    SongSetUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+
+    SetSong:
+      type: object
+      required: [id, title, artist, sortOrder]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        meta:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+
+    SongSetDetail:
+      type: object
+      required: [id, title, createdAt, songs]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+        songs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SetSong"
+
+    SetSongAdd:
+      type: object
+      required: [songId]
+      properties:
+        songId:
+          type: string
+
+    SetReorder:
+      type: object
+      required: [songIds]
+      properties:
+        songIds:
+          type: array
+          items:
+            type: string
+
+    LibraryStats:
+      type: object
+      required: [totalSongs, totalSets, totalTags, recentSongs]
+      properties:
+        totalSongs:
+          type: integer
+        totalSets:
+          type: integer
+        totalTags:
+          type: integer
+        recentSongs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Song"
+
+    UgTabSummary:
+      type: object
+      required: [id, title, artist, type, rating, votes]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        type:
+          type: string
+        rating:
+          type: number
+        votes:
+          type: integer
+        version:
+          type: ["integer", "null"]
+
+    UgSearchResults:
+      type: object
+      required: [tabs]
+      properties:
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/UgTabSummary"
+
+    UgTab:
+      type: object
+      required: [id, title, artist, type, lyricsChords]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        type:
+          type: string
+        lyricsChords:
+          type: string
+        rating:
+          type: ["number", "null"]
+        votes:
+          type: ["integer", "null"]
+
+    UgImportInput:
+      type: object
+      required: [ugId, title, artist, lyricsChords]
+      properties:
+        ugId:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        meta:
+          type: string
+        lyricsChords:
+          type: string

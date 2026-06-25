@@ -1,0 +1,1 @@
+- [SongBook architecture](songbook-architecture.md) — key decisions for UG API, Socket.io path, auth, and chord rendering

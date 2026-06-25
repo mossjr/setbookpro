@@ -1,0 +1,16 @@
+{
+  "name": "SongBook",
+  "short_name": "SongBook",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#191614",
+  "theme_color": "#f59e0b",
+  "description": "Shared chord and lyrics library for live musicians",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
