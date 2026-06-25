@@ -20,6 +20,7 @@ interface TabSummary {
   type: string;
   rating: number;
   votes: number;
+  version?: number | null;
 }
 
 const TYPE_STYLES: Record<string, string> = {
@@ -206,25 +207,33 @@ export default function ImportPage() {
           ) : (
             <div className="rounded-lg border border-border overflow-hidden">
               {/* Header row */}
-              <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <span>Song / Artist</span>
                 <span className="w-20 text-center">Type</span>
-                <span className="w-16 text-right">Rating</span>
-                <span className="w-16" />
+                <span className="w-14 text-right">Rating</span>
+                <span className="w-14 text-right">Votes</span>
+                <span className="w-14" />
               </div>
 
               {results.map((tab, i) => (
                 <div
                   key={tab.id}
-                  className={`grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 hover:bg-accent/50 transition-colors cursor-default ${
+                  className={`grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-3 py-2.5 hover:bg-accent/50 transition-colors cursor-default ${
                     i !== results.length - 1 ? "border-b border-border/60" : ""
                   }`}
                 >
-                  {/* Title + artist */}
+                  {/* Title + version + artist */}
                   <div className="min-w-0">
-                    <span className="font-semibold text-sm text-foreground truncate block leading-tight">
-                      {tab.title}
-                    </span>
+                    <div className="flex items-baseline gap-2 leading-tight">
+                      <span className="font-semibold text-sm text-foreground truncate">
+                        {tab.title}
+                      </span>
+                      {tab.version != null && tab.version > 1 && (
+                        <span className="text-xs font-normal text-primary/70 shrink-0">
+                          v{tab.version}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground truncate block">
                       {tab.artist}
                     </span>
@@ -234,15 +243,20 @@ export default function ImportPage() {
                   <TypeBadge type={tab.type} />
 
                   {/* Rating */}
-                  <div className="w-16 flex items-center justify-end gap-1 text-yellow-500">
+                  <div className="w-14 flex items-center justify-end gap-1 text-yellow-500">
                     <Star className="w-3.5 h-3.5 fill-current shrink-0" />
                     <span className="text-xs font-semibold tabular-nums">
                       {tab.rating > 0 ? tab.rating.toFixed(1) : "—"}
                     </span>
                   </div>
 
+                  {/* Vote count */}
+                  <div className="w-14 text-right text-xs tabular-nums text-muted-foreground">
+                    {tab.votes > 0 ? tab.votes.toLocaleString() : "—"}
+                  </div>
+
                   {/* Action */}
-                  <div className="w-16 flex justify-end">
+                  <div className="w-14 flex justify-end">
                     <Button
                       size="sm"
                       variant="ghost"
