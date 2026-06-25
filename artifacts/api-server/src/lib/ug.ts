@@ -127,3 +127,108 @@ export async function getUgTab(id: string): Promise<UgTabDetail> {
     votes: tab.votes ?? null,
   };
 }
+
+export interface UgPlaylistSong {
+  tabId: string;
+  title: string;
+  artist: string;
+}
+
+export interface UgPlaylistScrape {
+  playlistName: string;
+  songs: UgPlaylistSong[];
+}
+
+const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape";
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&#0?39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function parsePlaylistHtml(html: string): UgPlaylistScrape {
+  const rawName =
+    html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] ??
+    html.match(/<title>([\s\S]*?)<\/title>/)?.[1] ??
+    "";
+  const playlistName = decodeEntities(rawName.replace(/<[^>]+>/g, ""))
+    .replace(/\s*@\s*Ultimate-Guitar\.Com\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const re =
+    /<a href="https:\/\/tabs\.ultimate-guitar\.com\/tab\/([^/]+)\/[^"]*?-(\d+)"[^>]*>([^<]*)<\/a>/g;
+  const seen = new Map<string, UgPlaylistSong>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const artistSlug = m[1];
+    const tabId = m[2];
+    const title = decodeEntities(m[3].trim());
+    if (!tabId || seen.has(tabId)) continue;
+    const artist = artistSlug
+      .split("-")
+      .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+      .join(" ");
+    seen.set(tabId, { tabId, title, artist });
+  }
+  return { playlistName, songs: [...seen.values()] };
+}
+
+/**
+ * Validate that a URL is a shared Ultimate Guitar playlist link before we hand
+ * it to Firecrawl. Without this, the endpoint would be an authenticated proxy
+ * that scrapes arbitrary URLs on our Firecrawl quota (SSRF-style abuse).
+ */
+export function isUgPlaylistUrl(url: string): boolean {
+  if (typeof url !== "string" || url.length > 2048) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+  const host = parsed.hostname.toLowerCase();
+  if (host !== "ultimate-guitar.com" && host !== "www.ultimate-guitar.com") {
+    return false;
+  }
+  if (parsed.pathname.replace(/\/+$/, "") !== "/user/playlist/shared") {
+    return false;
+  }
+  const h = parsed.searchParams.get("h");
+  return !!h && h.trim().length > 0;
+}
+
+/**
+ * Read a shared Ultimate Guitar playlist link. The page is behind Cloudflare
+ * bot protection, so a plain fetch is blocked — we use Firecrawl to render the
+ * page and return the song anchors. See `.agents/memory/ug-playlist-import.md`.
+ */
+export async function scrapeUgPlaylist(url: string): Promise<UgPlaylistScrape> {
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (!key) {
+    throw new Error("FIRECRAWL_API_KEY is not configured");
+  }
+  const res = await fetch(FIRECRAWL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url, formats: ["rawHtml"], onlyMainContent: false }),
+  });
+  if (!res.ok) {
+    throw new Error(`Firecrawl error: ${res.status} ${res.statusText}`);
+  }
+  const json = (await res.json()) as { data?: { rawHtml?: string } };
+  const html = json?.data?.rawHtml ?? "";
+  if (!html) {
+    throw new Error("Firecrawl returned no HTML");
+  }
+  return parsePlaylistHtml(html);
+}

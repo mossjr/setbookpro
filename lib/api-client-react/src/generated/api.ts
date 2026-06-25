@@ -44,6 +44,10 @@ import type {
   TagInput,
   TagUpdate,
   UgImportInput,
+  UgPlaylistImportInput,
+  UgPlaylistImportResult,
+  UgPlaylistPreview,
+  UgPlaylistPreviewInput,
   UgSearchParams,
   UgSearchResults,
   UgTab,
@@ -2133,6 +2137,148 @@ export const useUgImportTab = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUgImportTabMutationOptions(options));
+    }
+
+export const getUgPlaylistPreviewUrl = () => {
+
+
+
+
+  return `/api/ug/playlist/preview`
+}
+
+/**
+ * @summary Preview songs from a shared Ultimate Guitar playlist link
+ */
+export const ugPlaylistPreview = async (ugPlaylistPreviewInput: UgPlaylistPreviewInput, options?: RequestInit): Promise<UgPlaylistPreview> => {
+
+  return customFetch<UgPlaylistPreview>(getUgPlaylistPreviewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ugPlaylistPreviewInput,)
+  }
+);}
+
+
+
+
+export const getUgPlaylistPreviewMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ugPlaylistPreview>>, TError,{data: BodyType<UgPlaylistPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ugPlaylistPreview>>, TError,{data: BodyType<UgPlaylistPreviewInput>}, TContext> => {
+
+const mutationKey = ['ugPlaylistPreview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ugPlaylistPreview>>, {data: BodyType<UgPlaylistPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  ugPlaylistPreview(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UgPlaylistPreviewMutationResult = NonNullable<Awaited<ReturnType<typeof ugPlaylistPreview>>>
+    export type UgPlaylistPreviewMutationBody = BodyType<UgPlaylistPreviewInput>
+    export type UgPlaylistPreviewMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Preview songs from a shared Ultimate Guitar playlist link
+ */
+export const useUgPlaylistPreview = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ugPlaylistPreview>>, TError,{data: BodyType<UgPlaylistPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ugPlaylistPreview>>,
+        TError,
+        {data: BodyType<UgPlaylistPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getUgPlaylistPreviewMutationOptions(options));
+    }
+
+export const getUgPlaylistImportUrl = () => {
+
+
+
+
+  return `/api/ug/playlist/import`
+}
+
+/**
+ * @summary Import previewed playlist songs into a set
+ */
+export const ugPlaylistImport = async (ugPlaylistImportInput: UgPlaylistImportInput, options?: RequestInit): Promise<UgPlaylistImportResult> => {
+
+  return customFetch<UgPlaylistImportResult>(getUgPlaylistImportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ugPlaylistImportInput,)
+  }
+);}
+
+
+
+
+export const getUgPlaylistImportMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ugPlaylistImport>>, TError,{data: BodyType<UgPlaylistImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ugPlaylistImport>>, TError,{data: BodyType<UgPlaylistImportInput>}, TContext> => {
+
+const mutationKey = ['ugPlaylistImport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ugPlaylistImport>>, {data: BodyType<UgPlaylistImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  ugPlaylistImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UgPlaylistImportMutationResult = NonNullable<Awaited<ReturnType<typeof ugPlaylistImport>>>
+    export type UgPlaylistImportMutationBody = BodyType<UgPlaylistImportInput>
+    export type UgPlaylistImportMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Import previewed playlist songs into a set
+ */
+export const useUgPlaylistImport = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ugPlaylistImport>>, TError,{data: BodyType<UgPlaylistImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ugPlaylistImport>>,
+        TError,
+        {data: BodyType<UgPlaylistImportInput>},
+        TContext
+      > => {
+      return useMutation(getUgPlaylistImportMutationOptions(options));
     }
 
 export const getSearchYoutubeUrl = (params: SearchYoutubeParams,) => {

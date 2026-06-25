@@ -524,6 +524,65 @@ export const UgImportTabBody = zod.object({
 
 
 /**
+ * @summary Preview songs from a shared Ultimate Guitar playlist link
+ */
+export const ugPlaylistPreviewBodyUrlMax = 2048;
+
+
+
+export const UgPlaylistPreviewBody = zod.object({
+  "url": zod.string().max(ugPlaylistPreviewBodyUrlMax).describe('A shared Ultimate Guitar playlist link.')
+})
+
+export const UgPlaylistPreviewResponse = zod.object({
+  "playlistName": zod.string(),
+  "setExists": zod.boolean(),
+  "items": zod.array(zod.object({
+  "tabId": zod.string(),
+  "title": zod.string(),
+  "artist": zod.string(),
+  "status": zod.enum(['new', 'duplicate']),
+  "existingSongId": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Import previewed playlist songs into a set
+ */
+export const ugPlaylistImportBodySetNameMax = 200;
+
+export const ugPlaylistImportBodyItemsItemTabIdMax = 32;
+
+
+export const ugPlaylistImportBodyItemsItemTabIdRegExp = new RegExp('^[0-9]+$');
+export const ugPlaylistImportBodyItemsItemTitleMax = 500;
+
+export const ugPlaylistImportBodyItemsItemArtistMax = 500;
+
+export const ugPlaylistImportBodyItemsMax = 2000;
+
+
+
+export const UgPlaylistImportBody = zod.object({
+  "setName": zod.string().min(1).max(ugPlaylistImportBodySetNameMax),
+  "items": zod.array(zod.object({
+  "tabId": zod.string().max(ugPlaylistImportBodyItemsItemTabIdMax).regex(ugPlaylistImportBodyItemsItemTabIdRegExp),
+  "title": zod.string().max(ugPlaylistImportBodyItemsItemTitleMax),
+  "artist": zod.string().max(ugPlaylistImportBodyItemsItemArtistMax),
+  "existingSongId": zod.string().nullish()
+})).min(1).max(ugPlaylistImportBodyItemsMax)
+})
+
+export const UgPlaylistImportResponse = zod.object({
+  "setId": zod.string(),
+  "imported": zod.number(),
+  "addedExisting": zod.number(),
+  "skipped": zod.number()
+})
+
+
+/**
  * @summary Search YouTube for videos to attach to a song
  */
 export const SearchYoutubeQueryParams = zod.object({

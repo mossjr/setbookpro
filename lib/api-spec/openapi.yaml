@@ -552,6 +552,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/Song"
 
+  /ug/playlist/preview:
+    post:
+      operationId: ugPlaylistPreview
+      tags: [ug]
+      summary: Preview songs from a shared Ultimate Guitar playlist link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UgPlaylistPreviewInput"
+      responses:
+        "200":
+          description: Playlist preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UgPlaylistPreview"
+        "400":
+          description: Invalid or unreadable playlist link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /ug/playlist/import:
+    post:
+      operationId: ugPlaylistImport
+      tags: [ug]
+      summary: Import previewed playlist songs into a set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UgPlaylistImportInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UgPlaylistImportResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   /media/search/youtube:
     get:
       operationId: searchYoutube
@@ -1031,3 +1081,86 @@ components:
           type: string
         lyricsChords:
           type: string
+
+    UgPlaylistPreviewInput:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          description: A shared Ultimate Guitar playlist link.
+
+    UgPlaylistPreviewItem:
+      type: object
+      required: [tabId, title, artist, status]
+      properties:
+        tabId:
+          type: string
+        title:
+          type: string
+        artist:
+          type: string
+        status:
+          type: string
+          enum: [new, duplicate]
+        existingSongId:
+          type: ["string", "null"]
+
+    UgPlaylistPreview:
+      type: object
+      required: [playlistName, setExists, items]
+      properties:
+        playlistName:
+          type: string
+        setExists:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UgPlaylistPreviewItem"
+
+    UgPlaylistImportItem:
+      type: object
+      required: [tabId, title, artist]
+      properties:
+        tabId:
+          type: string
+          pattern: "^[0-9]+$"
+          maxLength: 32
+        title:
+          type: string
+          maxLength: 500
+        artist:
+          type: string
+          maxLength: 500
+        existingSongId:
+          type: ["string", "null"]
+
+    UgPlaylistImportInput:
+      type: object
+      required: [setName, items]
+      properties:
+        setName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        items:
+          type: array
+          minItems: 1
+          maxItems: 2000
+          items:
+            $ref: "#/components/schemas/UgPlaylistImportItem"
+
+    UgPlaylistImportResult:
+      type: object
+      required: [setId, imported, addedExisting, skipped]
+      properties:
+        setId:
+          type: string
+        imported:
+          type: integer
+        addedExisting:
+          type: integer
+        skipped:
+          type: integer

@@ -1,1 +1,2 @@
 - [SongBook architecture](songbook-architecture.md) — key decisions for UG API, Socket.io path, auth, and chord rendering
+- [UG shared-playlist import](ug-playlist-import.md) — UG share links are Cloudflare-walled; need a JS-rendering scraper (Firecrawl) to read them server-side

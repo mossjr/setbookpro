@@ -256,6 +256,71 @@ export interface UgImportInput {
   lyricsChords: string;
 }
 
+export interface UgPlaylistPreviewInput {
+  /**
+     * A shared Ultimate Guitar playlist link.
+     * @maxLength 2048
+     */
+  url: string;
+}
+
+export type UgPlaylistPreviewItemStatus = typeof UgPlaylistPreviewItemStatus[keyof typeof UgPlaylistPreviewItemStatus];
+
+
+export const UgPlaylistPreviewItemStatus = {
+  new: 'new',
+  duplicate: 'duplicate',
+} as const;
+
+export interface UgPlaylistPreviewItem {
+  tabId: string;
+  title: string;
+  artist: string;
+  status: UgPlaylistPreviewItemStatus;
+  /** @nullable */
+  existingSongId?: string | null;
+}
+
+export interface UgPlaylistPreview {
+  playlistName: string;
+  setExists: boolean;
+  items: UgPlaylistPreviewItem[];
+}
+
+export interface UgPlaylistImportItem {
+  /**
+     * @maxLength 32
+     * @pattern ^[0-9]+$
+     */
+  tabId: string;
+  /** @maxLength 500 */
+  title: string;
+  /** @maxLength 500 */
+  artist: string;
+  /** @nullable */
+  existingSongId?: string | null;
+}
+
+export interface UgPlaylistImportInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  setName: string;
+  /**
+     * @minItems 1
+     * @maxItems 2000
+     */
+  items: UgPlaylistImportItem[];
+}
+
+export interface UgPlaylistImportResult {
+  setId: string;
+  imported: number;
+  addedExisting: number;
+  skipped: number;
+}
+
 export type ListSongsParams = {
 search?: string;
 tagId?: string;

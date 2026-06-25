@@ -5,11 +5,17 @@ import {
   useUgExplore, getUgExploreQueryKey,
   useUgGetTab, getUgGetTabQueryKey,
   useUgImportTab,
+  useUgPlaylistPreview,
+  useUgPlaylistImport,
+  type UgPlaylistPreview,
 } from "@workspace/api-client-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Download, Star, ArrowLeft, X, Check } from "lucide-react";
+import {
+  Search, Download, Star, ArrowLeft, X, Check,
+  Link2, ListMusic, Loader2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
 
@@ -118,9 +124,7 @@ function TabPreview({ tabId, onClose, onImported }: { tabId: string; onClose: ()
   );
 }
 
-export default function ImportPage() {
-  const [, setLocation] = useLocation();
-  const { setSelectedSongId } = useAppStore();
+function SearchImport({ onImported }: { onImported: (songId: string) => void }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -140,31 +144,18 @@ export default function ImportPage() {
     if (q.length > 0) setActiveSearch(q);
   };
 
-  const handleImported = (songId: string) => {
-    setPreviewId(null);
-    setSelectedSongId(songId);
-    setLocation("/");
-  };
-
   const results: TabSummary[] = (activeSearch ? searchResults?.tabs : exploreResults?.tabs) ?? [];
   const isLoading = activeSearch ? isSearching : isExploring;
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
+    <>
       {previewId && (
         <TabPreview
           tabId={previewId}
           onClose={() => setPreviewId(null)}
-          onImported={handleImported}
+          onImported={(songId) => { setPreviewId(null); onImported(songId); }}
         />
       )}
-
-      <header className="flex items-center gap-3 p-4 border-b border-border bg-card shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-xl font-bold">Import from Ultimate Guitar</h1>
-      </header>
 
       <div className="p-4 shrink-0 border-b border-border">
         <form onSubmit={handleSearch} className="flex gap-2">
@@ -273,6 +264,240 @@ export default function ImportPage() {
           )}
         </div>
       </ScrollArea>
+    </>
+  );
+}
+
+function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
+  const { toast } = useToast();
+  const [url, setUrl] = useState("");
+  const [setName, setSetName] = useState("");
+  const [preview, setPreview] = useState<UgPlaylistPreview | null>(null);
+
+  const previewMutation = useUgPlaylistPreview();
+  const importMutation = useUgPlaylistImport();
+
+  const handlePreview = (e: React.FormEvent) => {
+    e.preventDefault();
+    const u = url.trim();
+    if (!u) return;
+    setPreview(null);
+    previewMutation.mutate(
+      { data: { url: u } },
+      {
+        onSuccess: (data) => {
+          setPreview(data);
+          setSetName(data.playlistName);
+        },
+        onError: () => {
+          toast({
+            variant: "destructive",
+            title: "Couldn't read that link",
+            description: "Make sure it's a shared Ultimate Guitar playlist link, then try again.",
+          });
+        },
+      },
+    );
+  };
+
+  const handleImport = () => {
+    if (!preview) return;
+    const name = setName.trim() || preview.playlistName || "Imported playlist";
+    const items = preview.items.map((it) => ({
+      tabId: it.tabId,
+      title: it.title,
+      artist: it.artist,
+      existingSongId: it.existingSongId ?? null,
+    }));
+    importMutation.mutate(
+      { data: { setName: name, items } },
+      {
+        onSuccess: (result) => {
+          toast({
+            title: `Imported into "${name}"`,
+            description:
+              `${result.imported} new, ${result.addedExisting} already in library` +
+              (result.skipped ? `, ${result.skipped} skipped` : "") + ".",
+          });
+          onDone(result.setId);
+        },
+        onError: () => {
+          toast({ variant: "destructive", title: "Import failed", description: "Something went wrong while importing." });
+        },
+      },
+    );
+  };
+
+  const newCount = preview?.items.filter((i) => i.status === "new").length ?? 0;
+  const dupCount = preview?.items.filter((i) => i.status === "duplicate").length ?? 0;
+  const importing = importMutation.isPending;
+
+  return (
+    <>
+      <div className="p-4 shrink-0 border-b border-border space-y-2">
+        <form onSubmit={handlePreview} className="flex gap-2">
+          <div className="relative flex-1">
+            <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Paste an Ultimate Guitar playlist link..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" disabled={previewMutation.isPending || !url.trim()}>
+            {previewMutation.isPending ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Scanning…</>
+            ) : (
+              "Preview"
+            )}
+          </Button>
+        </form>
+        <p className="text-xs text-muted-foreground">
+          In Ultimate Guitar, open a playlist, tap Share, and paste the link here. We'll scan it and import every song into a set.
+        </p>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="p-4 max-w-3xl mx-auto">
+          {!preview && !previewMutation.isPending && (
+            <div className="text-center py-16 text-muted-foreground">
+              <ListMusic className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              Paste a shared playlist link to get started.
+            </div>
+          )}
+
+          {previewMutation.isPending && (
+            <div className="text-center py-16 text-muted-foreground">Scanning playlist…</div>
+          )}
+
+          {preview && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border p-4 bg-card space-y-3">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Playlist</div>
+                  <div className="font-bold text-lg leading-tight">
+                    {preview.playlistName || "Untitled playlist"}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="px-2 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                    {newCount} new
+                  </span>
+                  <span className="px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border">
+                    {dupCount} already in library
+                  </span>
+                  <span className="px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border">
+                    {preview.items.length} total
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Set name</label>
+                  <Input
+                    value={setName}
+                    onChange={(e) => setSetName(e.target.value)}
+                    className="mt-1"
+                    placeholder="Name this set"
+                  />
+                  {preview.setExists && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      A set with this name already exists — songs will be added to it.
+                    </p>
+                  )}
+                </div>
+
+                <Button onClick={handleImport} disabled={importing} className="w-full">
+                  {importing ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importing… this can take a minute</>
+                  ) : (
+                    <><Download className="w-4 h-4 mr-2" />Import {preview.items.length} songs</>
+                  )}
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-border overflow-hidden">
+                {preview.items.map((it, i) => (
+                  <div
+                    key={`${it.tabId}-${i}`}
+                    className={`flex items-center gap-3 px-3 py-2 ${
+                      i !== preview.items.length - 1 ? "border-b border-border/60" : ""
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm truncate">{it.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">{it.artist}</div>
+                    </div>
+                    {it.status === "new" ? (
+                      <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                        New
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-xs font-semibold px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border">
+                        In library
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </>
+  );
+}
+
+export default function ImportPage() {
+  const [, setLocation] = useLocation();
+  const { setSelectedSongId } = useAppStore();
+  const [mode, setMode] = useState<"search" | "playlist">("search");
+
+  const handleImported = (songId: string) => {
+    setSelectedSongId(songId);
+    setLocation("/");
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      <header className="flex items-center gap-3 p-4 border-b border-border bg-card shrink-0">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <h1 className="text-xl font-bold">Import from Ultimate Guitar</h1>
+      </header>
+
+      <div className="px-4 pt-3 shrink-0">
+        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => setMode("search")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              mode === "search" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            Search
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("playlist")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              mode === "playlist" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Link2 className="w-4 h-4" />
+            From Playlist Link
+          </button>
+        </div>
+      </div>
+
+      {mode === "search" ? (
+        <SearchImport onImported={handleImported} />
+      ) : (
+        <PlaylistImport onDone={(setId) => setLocation(`/sets/${setId}`)} />
+      )}
     </div>
   );
 }
