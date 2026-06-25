@@ -8,6 +8,7 @@ import BottomScrollScrubber from "./BottomScrollScrubber";
 import SettingsDialog from "./SettingsDialog";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
+import { useAutoFitLayout } from "@/hooks/useAutoFitLayout";
 import { resolveAudioUrl } from "@/lib/media";
 import { parseYouTubeId } from "@/lib/youtube";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export default function SongView({ songId }: { songId: string }) {
   const [transpose, setTranspose] = useState(0);
   const [mediaOpen, setMediaOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
 
   const pressTimer = useRef<number | null>(null);
   const longPressed = useRef(false);
@@ -70,6 +72,17 @@ export default function SongView({ songId }: { songId: string }) {
   // stays in sync whether the panel is open or closed.
   const ytWrapperRef = useRef<HTMLDivElement>(null);
   const yt = useYouTubePlayer(ytWrapperRef, youtubeVideoId);
+
+  // 'auto' is the intelligent multi-column fit; legacy 'columns' maps onto it.
+  const layoutMode = displayMode === "columns" ? "auto" : displayMode;
+  const auto = useAutoFitLayout({
+    enabled: layoutMode === "auto",
+    scrollRef,
+    measureRef,
+    lyricsOnly,
+    recomputeKey: `${song?.id ?? ""}|${transpose}|${lyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}`,
+  });
+  const effectiveZoom = layoutMode === "auto" ? auto.zoom : zoom;
 
   if (isLoading)
     return (
@@ -246,11 +259,15 @@ export default function SongView({ songId }: { songId: string }) {
             variant="ghost"
             size="icon"
             onClick={() =>
-              setDisplayMode(displayMode === "columns" ? "scroll" : "columns")
+              setDisplayMode(layoutMode === "auto" ? "scroll" : "auto")
             }
-            title="Toggle Layout"
+            title={
+              layoutMode === "auto"
+                ? "Auto-fit columns (tap for scroll)"
+                : "Scroll (tap for auto-fit)"
+            }
           >
-            {displayMode === "columns" ? (
+            {layoutMode === "auto" ? (
               <Columns className="w-5 h-5" />
             ) : (
               <AlignLeft className="w-5 h-5" />
@@ -275,11 +292,20 @@ export default function SongView({ songId }: { songId: string }) {
       {/* Song Body */}
       <div
         ref={scrollRef}
-        className={`flex-1 overflow-auto p-4 md:p-8 ${displayMode === "columns" ? "md:columns-2 md:gap-8" : ""}`}
+        className="flex-1 overflow-auto p-4 md:p-8"
+        style={
+          layoutMode === "auto"
+            ? {
+                columnCount: auto.columnCount,
+                columnGap: "2rem",
+                columnFill: "balance",
+              }
+            : undefined
+        }
       >
         <ChordRenderer
           text={song.lyricsChords}
-          zoom={zoom}
+          zoom={effectiveZoom}
           transpose={transpose}
           lyricsOnly={lyricsOnly}
           lyricsFontSize={lyricsFontSize}
@@ -288,6 +314,33 @@ export default function SongView({ songId }: { songId: string }) {
         />
       </div>
 
+      {/* Hidden measurer: a zoom-1 mirror of the song used purely to compute the
+          optimal column count + zoom for auto-fit. Never shown to the user. */}
+      {layoutMode === "auto" && (
+        <div
+          ref={measureRef}
+          aria-hidden
+          className="pointer-events-none"
+          style={{
+            position: "absolute",
+            visibility: "hidden",
+            left: -99999,
+            top: 0,
+            zIndex: -1,
+          }}
+        >
+          <ChordRenderer
+            text={song.lyricsChords}
+            zoom={1}
+            transpose={transpose}
+            lyricsOnly={lyricsOnly}
+            lyricsFontSize={lyricsFontSize}
+            chordsFontSize={chordsFontSize}
+            accentColor={accentColor}
+          />
+        </div>
+      )}
+
       {/* Floating Controls (sit above the scroll scrubber) */}
       <div className="absolute bottom-[4.5rem] right-4 sm:right-6 flex flex-col gap-3 items-center z-20">
         <div className="flex flex-col bg-card border border-border shadow-lg rounded-full overflow-hidden">
@@ -295,7 +348,11 @@ export default function SongView({ songId }: { songId: string }) {
             variant="ghost"
             size="icon"
             className="h-10 w-10 rounded-none"
-            onClick={() => setZoom(Math.min(3, zoom + 0.1))}
+            onClick={() =>
+              layoutMode === "auto"
+                ? auto.nudgeZoom(0.1)
+                : setZoom(Math.min(3, zoom + 0.1))
+            }
             aria-label="Zoom in"
           >
             <Plus className="w-4 h-4" />
@@ -305,7 +362,7 @@ export default function SongView({ songId }: { songId: string }) {
             variant="ghost"
             size="icon"
             className="h-10 w-10 rounded-none text-[11px] font-semibold"
-            onClick={fitToScreen}
+            onClick={() => (layoutMode === "auto" ? auto.refit() : fitToScreen())}
             aria-label="Fit song to screen"
             title="Fit whole song on screen"
           >
@@ -316,7 +373,11 @@ export default function SongView({ songId }: { songId: string }) {
             variant="ghost"
             size="icon"
             className="h-10 w-10 rounded-none"
-            onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+            onClick={() =>
+              layoutMode === "auto"
+                ? auto.nudgeZoom(-0.1)
+                : setZoom(Math.max(0.5, zoom - 0.1))
+            }
             aria-label="Zoom out"
           >
             <Minus className="w-4 h-4" />

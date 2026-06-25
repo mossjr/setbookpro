@@ -80,8 +80,8 @@ export default function BottomScrollScrubber({
   );
 
   const begin = useCallback(() => {
-    // Multi-column layout cannot vertical-scroll; force a scrollable mode.
-    if (displayMode === "columns") setDisplayMode("scroll");
+    // Multi-column / auto-fit layout cannot vertical-scroll; force scroll mode.
+    if (displayMode !== "scroll") setDisplayMode("scroll");
     setIsScrolling(true);
     lastTsRef.current = 0;
     rafRef.current = requestAnimationFrame(step);

@@ -124,18 +124,18 @@ export default function SettingsDialog() {
             <Label>Default layout</Label>
             <div className="flex gap-2">
               <Button
-                variant={displayMode !== "columns" ? "default" : "outline"}
+                variant={displayMode === "scroll" ? "default" : "outline"}
                 onClick={() => setDisplayMode("scroll")}
                 className="flex-1"
               >
                 <AlignLeft className="w-4 h-4 mr-2" /> Scroll
               </Button>
               <Button
-                variant={displayMode === "columns" ? "default" : "outline"}
-                onClick={() => setDisplayMode("columns")}
+                variant={displayMode !== "scroll" ? "default" : "outline"}
+                onClick={() => setDisplayMode("auto")}
                 className="flex-1"
               >
-                <Columns className="w-4 h-4 mr-2" /> Columns
+                <Columns className="w-4 h-4 mr-2" /> Auto-fit
               </Button>
             </div>
           </div>
