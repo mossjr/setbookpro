@@ -29,7 +29,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useAppStore } from "@/store";
-import { ArrowLeft, Play, Music, GripVertical, MoreVertical, X } from "lucide-react";
+import { ArrowLeft, Play, Music, GripVertical, MoreVertical, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -161,7 +161,8 @@ export default function SetView() {
   const setId = params?.id || "";
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { setSelectedSongId, setActiveSetId, setSidebarOpen } = useAppStore();
+  const { setSelectedSongId, setActiveSetId, setSidebarOpen, setDesktopSidebarOpen } =
+    useAppStore();
 
   const { data: set, isLoading } = useGetSet(setId, {
     query: { enabled: !!setId, queryKey: getGetSetQueryKey(setId) },
@@ -332,12 +333,28 @@ export default function SetView() {
           <div className="text-center p-12 border-2 border-dashed border-border rounded-xl mt-8">
             <Music className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">This set is empty</h3>
-            <p className="text-muted-foreground mb-4">
-              Go to your Songs library and add songs to this set.
+            <p className="text-muted-foreground mb-4 max-w-sm mx-auto">
+              Open your library, then use a song&apos;s{" "}
+              <span className="font-medium text-foreground">⋮</span> menu and
+              choose{" "}
+              <span className="font-medium text-foreground">
+                “Add to set” → {set.title}
+              </span>{" "}
+              to build this set.
             </p>
-            <Button asChild variant="outline">
-              <Link href="/">Go to Library</Link>
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                onClick={() => {
+                  setDesktopSidebarOpen(true);
+                  setSidebarOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" /> Add songs
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/">Go to Library</Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <>
