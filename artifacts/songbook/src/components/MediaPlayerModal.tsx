@@ -200,6 +200,14 @@ export default function MediaPlayerModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Android ghost-click guard: a tap that opens the modal fires a synthetic
+  // click event ~100-300 ms later at the same screen coords, which lands on
+  // the backdrop and immediately closes the modal. Ignore backdrop clicks
+  // within 350 ms of the modal opening.
+  const openedAtRef = useRef<number>(0);
+  useEffect(() => {
+    if (open) openedAtRef.current = Date.now();
+  }, [open]);
 
   const audioConfigured = !!song.audioUrl;
   const youtubeVideoId = song.youtubeUrl
@@ -421,7 +429,10 @@ export default function MediaPlayerModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60"
-        onClick={() => onOpenChange(false)}
+        onClick={() => {
+          if (Date.now() - openedAtRef.current < 350) return;
+          onOpenChange(false);
+        }}
       />
 
       <div
