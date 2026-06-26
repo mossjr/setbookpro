@@ -579,7 +579,14 @@ export default function Sidebar() {
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs
+          value={activeTab}
+          onValueChange={(tab) => {
+            if (tab !== "sets") setSetsSearch("");
+            setActiveTab(tab);
+          }}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-3 bg-sidebar-accent/50">
             <TabsTrigger value="songs">
               <Music className="w-4 h-4 mr-2 hidden sm:block" />
