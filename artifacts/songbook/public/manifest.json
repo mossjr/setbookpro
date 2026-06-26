@@ -4,7 +4,7 @@
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#191614",
   "theme_color": "#191614",
   "description": "Shared chord and lyrics library for live musicians",
