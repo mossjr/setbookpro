@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { HostMode, PresentState, SyncState } from '@workspace/gig-protocol';
+import { type SongFilterValues, emptyFilters } from '@/lib/songMeta';
 
 type DisplayMode = 'scroll' | 'split' | 'auto';
 
@@ -70,6 +71,8 @@ interface AppState {
   desktopSidebarOpen: boolean;
   setDesktopSidebarOpen: (open: boolean) => void;
   toggleDesktopSidebar: () => void;
+  filters: SongFilterValues;
+  setFilters: (filters: SongFilterValues | ((prev: SongFilterValues) => SongFilterValues)) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -195,14 +198,25 @@ export const useAppStore = create<AppState>()(
       setDesktopSidebarOpen: (desktopSidebarOpen) => set({ desktopSidebarOpen }),
       toggleDesktopSidebar: () =>
         set((s) => ({ desktopSidebarOpen: !s.desktopSidebarOpen })),
+      filters: emptyFilters,
+      setFilters: (filtersOrUpdater) =>
+        set((s) => ({
+          filters:
+            typeof filtersOrUpdater === 'function'
+              ? filtersOrUpdater(s.filters)
+              : filtersOrUpdater,
+        })),
     }),
     {
       name: 'songbook-app-state',
-      version: 1,
+      version: 2,
       migrate: (persisted, _version) => {
         const state = persisted as Partial<AppState> | undefined;
         if (state && (state.displayMode as string) === 'columns') {
           state.displayMode = 'split';
+        }
+        if (state && !state.filters) {
+          state.filters = emptyFilters;
         }
         return state as AppState;
       },
@@ -215,7 +229,8 @@ export const useAppStore = create<AppState>()(
         participantLyricsOnly: state.participantLyricsOnly,
         desktopSidebarOpen: state.desktopSidebarOpen,
         activeSetId: state.activeSetId,
-        lastPlayedSongId: state.lastPlayedSongId
+        lastPlayedSongId: state.lastPlayedSongId,
+        filters: state.filters,
       }),
     }
   )

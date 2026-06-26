@@ -95,6 +95,8 @@ export default function Sidebar() {
     activeSetId,
     setActiveSetId,
     lastPlayedSongId,
+    filters,
+    setFilters,
   } = useAppStore();
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
@@ -108,8 +110,6 @@ export default function Sidebar() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
-  const [filters, setFilters] = useState<SongFilterValues>(emptyFilters);
-
   const { data: songs = [], isLoading: loadingSongs } = useListSongs(
     { search },
     { query: { queryKey: getListSongsQueryKey({ search }) } },
