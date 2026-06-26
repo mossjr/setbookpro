@@ -566,359 +566,366 @@ export default function Sidebar() {
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-hidden relative">
-        <ScrollArea className="h-full">
-          {activeTab === "songs" && !activeSetId && (
-            <div className="p-4 space-y-3">
-              <div className="flex items-center gap-1.5">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                  <Input
-                    placeholder="Search songs..."
-                    className="pl-9 bg-background/50 border-sidebar-border h-10"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                {renderFilters()}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  onClick={openNewSong}
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Add
-                </Button>
-                <Button
-                  size="sm"
-                  variant={selectMode ? "default" : "outline"}
-                  onClick={() =>
-                    selectMode ? exitSelectMode() : setSelectMode(true)
-                  }
-                >
-                  {selectMode ? (
-                    <X className="w-4 h-4" />
-                  ) : (
-                    <CheckSquare className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  title="Import songs (JSON)"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  title="Export songs (JSON)"
-                  onClick={handleExport}
-                >
-                  <Download className="w-4 h-4" />
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  onChange={handleImportFile}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Sticky toolbar: songs tab, no active set */}
+        {activeTab === "songs" && !activeSetId && (
+          <div className="px-4 pt-4 pb-3 space-y-3 shrink-0 border-b border-sidebar-border">
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                <Input
+                  placeholder="Search songs..."
+                  className="pl-9 bg-background/50 border-sidebar-border h-10"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-
-              {selectMode && (
-                <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-sidebar-accent/40 p-2 text-xs">
-                  <span className="font-medium px-1">
-                    {selected.size} selected
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2"
-                    onClick={allSelected ? clearSelection : selectAll}
-                  >
-                    {allSelected ? "Clear" : "All"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2"
-                    onClick={invertSelection}
-                  >
-                    Invert
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2"
-                        disabled={selected.size === 0}
-                      >
-                        <ListPlus className="w-3.5 h-3.5 mr-1" /> Add to set
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuLabel>Add to set</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {sets.length === 0 ? (
-                        <DropdownMenuItem disabled>No sets yet</DropdownMenuItem>
-                      ) : (
-                        sets.map((set) => (
-                          <DropdownMenuItem
-                            key={set.id}
-                            onClick={() => handleAddToSet(set.id)}
-                          >
-                            {set.title}
-                          </DropdownMenuItem>
-                        ))
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-destructive hover:text-destructive"
-                    disabled={selected.size === 0}
-                    onClick={handleDeleteSelected}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
-                  </Button>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {loadingSongs ? (
-                  <div className="text-center p-4 text-muted-foreground">
-                    Loading...
-                  </div>
-                ) : songs.length === 0 ? (
-                  <div className="text-center p-4 text-muted-foreground">
-                    No songs found.
-                  </div>
-                ) : filteredSongs.length === 0 ? (
-                  <div className="text-center p-4 text-muted-foreground">
-                    No songs match your filters.
-                  </div>
-                ) : (
-                  grouped.map(([letter, items]) => (
-                    <div key={letter}>
-                      <div className="sticky top-0 z-10 bg-sidebar/95 backdrop-blur px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wide">
-                        {letter}
-                      </div>
-                      <div className="space-y-0.5">
-                        {items.map((song) => {
-                          const isSel = selected.has(song.id);
-                          return (
-                            <div
-                              key={song.id}
-                              className={`group flex items-center gap-2 rounded-md pr-1 transition-colors ${
-                                selectedSongId === song.id && !selectMode
-                                  ? "bg-primary/20"
-                                  : "hover:bg-sidebar-accent"
-                              } ${lastPlayedSongId === song.id ? "ring-1 ring-primary/60" : ""}`}
-                            >
-                              {selectMode && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSelected(song.id)}
-                                  className="pl-2 py-3 shrink-0 text-muted-foreground"
-                                >
-                                  {isSel ? (
-                                    <CheckSquare className="w-4 h-4 text-primary" />
-                                  ) : (
-                                    <Square className="w-4 h-4" />
-                                  )}
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleSelectSong(song.id)}
-                                className="flex-1 min-w-0 text-left py-2.5 px-2"
-                              >
-                                <div className="font-semibold text-foreground truncate">
-                                  {song.title}
-                                </div>
-                                <div className="text-sm text-muted-foreground truncate">
-                                  {song.artist}
-                                </div>
-                                {song.tags && song.tags.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {song.tags.map((t) => (
-                                      <span
-                                        key={t.id}
-                                        className="px-1.5 py-0.5 rounded text-[10px] font-medium"
-                                        style={{
-                                          backgroundColor: `${t.color}22`,
-                                          color: t.color,
-                                        }}
-                                      >
-                                        {t.name}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {renderMetaRow(song)}
-                              </button>
-                              {lastPlayedSongId === song.id && (
-                                <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
-                              )}
-                              {!selectMode && (
-                                <div className="flex shrink-0">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-8 w-8"
-                                        aria-label="Song actions"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <MoreVertical className="w-4 h-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => openEditSong(song)}
-                                      >
-                                        <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger>
-                                          <ListPlus className="w-3.5 h-3.5 mr-2" />
-                                          Add to set
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuSubContent>
-                                          {sets.length === 0 ? (
-                                            <DropdownMenuItem disabled>
-                                              No sets yet
-                                            </DropdownMenuItem>
-                                          ) : (
-                                            sets.map((set) => (
-                                              <DropdownMenuItem
-                                                key={set.id}
-                                                onClick={() =>
-                                                  handleAddSongToSet(
-                                                    song.id,
-                                                    set.id,
-                                                    set.title,
-                                                  )
-                                                }
-                                              >
-                                                {set.title}
-                                              </DropdownMenuItem>
-                                            ))
-                                          )}
-                                        </DropdownMenuSubContent>
-                                      </DropdownMenuSub>
-                                      <DropdownMenuItem
-                                        className="text-destructive focus:text-destructive"
-                                        onClick={() => handleDeleteSong(song)}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              {renderFilters()}
             </div>
-          )}
 
-          {activeTab === "songs" && activeSetId && (
-            <div className="p-4 space-y-3">
-              {!activeSet ? (
-                <div className="text-center p-4 text-muted-foreground">
-                  Loading set...
-                </div>
-              ) : (
-                <>
-                  <div className="rounded-md bg-primary/10 border border-primary/30 p-2.5 space-y-2">
-                    <div className="flex items-start gap-2 min-w-0">
-                      <ListMusic className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <div className="text-[10px] uppercase tracking-wide text-primary font-semibold">
-                          Playing set
-                        </div>
-                        <div className="font-semibold text-foreground break-words">
-                          {activeSet.title}
-                        </div>
-                      </div>
-                    </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={openNewSong}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add
+              </Button>
+              <Button
+                size="sm"
+                variant={selectMode ? "default" : "outline"}
+                onClick={() =>
+                  selectMode ? exitSelectMode() : setSelectMode(true)
+                }
+              >
+                {selectMode ? (
+                  <X className="w-4 h-4" />
+                ) : (
+                  <CheckSquare className="w-4 h-4" />
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                title="Import songs (JSON)"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                title="Export songs (JSON)"
+                onClick={handleExport}
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+            </div>
+
+            {selectMode && (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-sidebar-accent/40 p-2 text-xs">
+                <span className="font-medium px-1">
+                  {selected.size} selected
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2"
+                  onClick={allSelected ? clearSelection : selectAll}
+                >
+                  {allSelected ? "Clear" : "All"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2"
+                  onClick={invertSelection}
+                >
+                  Invert
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 w-full justify-center text-muted-foreground"
-                      onClick={() => setActiveSetId(null)}
-                      title="Exit set"
+                      className="h-7 px-2"
+                      disabled={selected.size === 0}
                     >
-                      <X className="w-4 h-4 mr-1" /> Exit set
+                      <ListPlus className="w-3.5 h-3.5 mr-1" /> Add to set
                     </Button>
-                  </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuLabel>Add to set</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {sets.length === 0 ? (
+                      <DropdownMenuItem disabled>No sets yet</DropdownMenuItem>
+                    ) : (
+                      sets.map((set) => (
+                        <DropdownMenuItem
+                          key={set.id}
+                          onClick={() => handleAddToSet(set.id)}
+                        >
+                          {set.title}
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-destructive hover:text-destructive"
+                  disabled={selected.size === 0}
+                  onClick={handleDeleteSelected}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
-                  {activeSet.songs.length === 0 ? (
-                    <div className="text-center p-4 text-muted-foreground text-sm">
-                      This set has no songs.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {visibleSetSongs.length}/{activeSet.songs.length} songs
-                        </span>
-                        {renderFilters()}
+        {/* Sticky toolbar: songs tab, active set */}
+        {activeTab === "songs" && activeSetId && (
+          <div className="px-4 pt-4 pb-3 space-y-3 shrink-0 border-b border-sidebar-border">
+            {!activeSet ? (
+              <div className="text-center p-4 text-muted-foreground">
+                Loading set...
+              </div>
+            ) : (
+              <>
+                <div className="rounded-md bg-primary/10 border border-primary/30 p-2.5 space-y-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <ListMusic className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-wide text-primary font-semibold">
+                        Playing set
                       </div>
-                      {visibleSetSongs.length === 0 ? (
-                        <div className="text-center p-4 text-muted-foreground text-sm">
-                          No songs match your filters.
-                        </div>
-                      ) : (
-                        <div className="space-y-0.5">
-                          {visibleSetSongs.map(({ song, position }) => {
-                            const isCurrent = selectedSongId === song.id;
-                            const isLast = lastPlayedSongId === song.id;
-                            return (
+                      <div className="font-semibold text-foreground break-words">
+                        {activeSet.title}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-full justify-center text-muted-foreground"
+                    onClick={() => setActiveSetId(null)}
+                    title="Exit set"
+                  >
+                    <X className="w-4 h-4 mr-1" /> Exit set
+                  </Button>
+                </div>
+
+                {activeSet.songs.length > 0 && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {visibleSetSongs.length}/{activeSet.songs.length} songs
+                    </span>
+                    {renderFilters()}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <ScrollArea className="flex-1">
+          {activeTab === "songs" && !activeSetId && (
+            <div className="px-4 pt-3 pb-4 space-y-2">
+              {loadingSongs ? (
+                <div className="text-center p-4 text-muted-foreground">
+                  Loading...
+                </div>
+              ) : songs.length === 0 ? (
+                <div className="text-center p-4 text-muted-foreground">
+                  No songs found.
+                </div>
+              ) : filteredSongs.length === 0 ? (
+                <div className="text-center p-4 text-muted-foreground">
+                  No songs match your filters.
+                </div>
+              ) : (
+                grouped.map(([letter, items]) => (
+                  <div key={letter}>
+                    <div className="sticky top-0 z-10 bg-sidebar/95 backdrop-blur px-2 py-1 text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                      {letter}
+                    </div>
+                    <div className="space-y-0.5">
+                      {items.map((song) => {
+                        const isSel = selected.has(song.id);
+                        return (
+                          <div
+                            key={song.id}
+                            className={`group flex items-center gap-2 rounded-md pr-1 transition-colors ${
+                              selectedSongId === song.id && !selectMode
+                                ? "bg-primary/20"
+                                : "hover:bg-sidebar-accent"
+                            } ${lastPlayedSongId === song.id ? "ring-1 ring-primary/60" : ""}`}
+                          >
+                            {selectMode && (
                               <button
-                                key={song.id}
-                                onClick={() => handleSelectSong(song.id)}
-                                className={`group flex items-center gap-3 w-full text-left rounded-md p-2.5 transition-colors ${
-                                  isCurrent
-                                    ? "bg-primary/20"
-                                    : "hover:bg-sidebar-accent"
-                                } ${isLast ? "ring-1 ring-primary/60" : ""}`}
+                                type="button"
+                                onClick={() => toggleSelected(song.id)}
+                                className="pl-2 py-3 shrink-0 text-muted-foreground"
                               >
-                                <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full text-xs font-bold text-muted-foreground shrink-0">
-                                  {position}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-foreground truncate">
-                                    {song.title}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground truncate">
-                                    {song.artist}
-                                  </div>
-                                  {renderMetaRow(song)}
-                                </div>
-                                {isLast && (
-                                  <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                                {isSel ? (
+                                  <CheckSquare className="w-4 h-4 text-primary" />
+                                ) : (
+                                  <Square className="w-4 h-4" />
                                 )}
                               </button>
-                            );
-                          })}
+                            )}
+                            <button
+                              onClick={() => handleSelectSong(song.id)}
+                              className="flex-1 min-w-0 text-left py-2.5 px-2"
+                            >
+                              <div className="font-semibold text-foreground truncate">
+                                {song.title}
+                              </div>
+                              <div className="text-sm text-muted-foreground truncate">
+                                {song.artist}
+                              </div>
+                              {song.tags && song.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {song.tags.map((t) => (
+                                    <span
+                                      key={t.id}
+                                      className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                                      style={{
+                                        backgroundColor: `${t.color}22`,
+                                        color: t.color,
+                                      }}
+                                    >
+                                      {t.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {renderMetaRow(song)}
+                            </button>
+                            {lastPlayedSongId === song.id && (
+                              <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                            )}
+                            {!selectMode && (
+                              <div className="flex shrink-0">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8"
+                                      aria-label="Song actions"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => openEditSong(song)}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger>
+                                        <ListPlus className="w-3.5 h-3.5 mr-2" />
+                                        Add to set
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent>
+                                        {sets.length === 0 ? (
+                                          <DropdownMenuItem disabled>
+                                            No sets yet
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          sets.map((set) => (
+                                            <DropdownMenuItem
+                                              key={set.id}
+                                              onClick={() =>
+                                                handleAddSongToSet(
+                                                  song.id,
+                                                  set.id,
+                                                  set.title,
+                                                )
+                                              }
+                                            >
+                                              {set.title}
+                                            </DropdownMenuItem>
+                                          ))
+                                        )}
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={() => handleDeleteSong(song)}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === "songs" && activeSetId && activeSet && (
+            <div className="px-4 pt-3 pb-4">
+              {activeSet.songs.length === 0 ? (
+                <div className="text-center p-4 text-muted-foreground text-sm">
+                  This set has no songs.
+                </div>
+              ) : visibleSetSongs.length === 0 ? (
+                <div className="text-center p-4 text-muted-foreground text-sm">
+                  No songs match your filters.
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {visibleSetSongs.map(({ song, position }) => {
+                    const isCurrent = selectedSongId === song.id;
+                    const isLast = lastPlayedSongId === song.id;
+                    return (
+                      <button
+                        key={song.id}
+                        onClick={() => handleSelectSong(song.id)}
+                        className={`group flex items-center gap-3 w-full text-left rounded-md p-2.5 transition-colors ${
+                          isCurrent
+                            ? "bg-primary/20"
+                            : "hover:bg-sidebar-accent"
+                        } ${isLast ? "ring-1 ring-primary/60" : ""}`}
+                      >
+                        <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full text-xs font-bold text-muted-foreground shrink-0">
+                          {position}
                         </div>
-                      )}
-                    </>
-                  )}
-                </>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-foreground truncate">
+                            {song.title}
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {song.artist}
+                          </div>
+                          {renderMetaRow(song)}
+                        </div>
+                        {isLast && (
+                          <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
