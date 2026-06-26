@@ -53,6 +53,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -582,6 +583,15 @@ export default function SongView({ songId }: { songId: string }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={zoomIn}>
+                <Plus className="w-4 h-4 mr-2 shrink-0" />
+                Larger text
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={zoomOut}>
+                <Minus className="w-4 h-4 mr-2 shrink-0" />
+                Smaller text
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => applyLyricsOnly(!effectiveLyricsOnly)}
               >
@@ -803,9 +813,12 @@ export default function SongView({ songId }: { songId: string }) {
       )}
 
       {/* Floating Controls (sit above the page-turn tap zones) */}
+      {/* bottom uses env(safe-area-inset-bottom) so the stack clears the iOS
+          home-indicator bar and Chrome's collapsible browser chrome. */}
       <div
         data-no-page-nav
-        className="absolute bottom-6 right-4 sm:right-6 flex flex-col gap-3 items-center z-20"
+        className="absolute right-4 sm:right-6 flex flex-col gap-3 items-center z-20"
+        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="flex flex-col bg-card border border-border shadow-lg rounded-full overflow-hidden">
           <Button
