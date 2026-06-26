@@ -307,8 +307,12 @@ export default function Sidebar() {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <Music className="w-5 h-5 text-primary" />
-            SongBook
+            <img
+              src="/setbook-icon.png"
+              alt=""
+              className="w-7 h-7 rounded-md shadow-sm"
+            />
+            Set Book Pro
           </h2>
           <Button
             variant="ghost"

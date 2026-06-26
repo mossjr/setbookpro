@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Music } from "lucide-react";
 
 const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
@@ -34,7 +33,7 @@ export default function Login() {
             localStorage.setItem("songbook_token", res.token);
             setToken(res.token);
             toast({
-              title: "Welcome to SongBook",
+              title: "Welcome to Set Book Pro",
               description: "Successfully logged in.",
             });
           }
@@ -54,10 +53,12 @@ export default function Login() {
     <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <Music className="w-10 h-10" />
-          </div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">SongBook</h1>
+          <img
+            src="/setbook-icon.png"
+            alt="Set Book Pro"
+            className="w-24 h-24 rounded-3xl shadow-xl shadow-black/40"
+          />
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">Set Book Pro</h1>
           <p className="text-muted-foreground text-center">
             Shared chord & lyrics library for live musicians
           </p>
@@ -93,6 +94,10 @@ export default function Login() {
             </Button>
           </form>
         </Form>
+
+        <p className="text-center text-xs text-muted-foreground/50 pt-2">
+          setbook.pro
+        </p>
       </div>
     </div>
   );

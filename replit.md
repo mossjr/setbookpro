@@ -1,6 +1,6 @@
-# SongBook
+# Set Book Pro
 
-A full-stack PWA for shared chord/lyrics library management — built for live musicians to view, manage, and sync songs on stage.
+A full-stack PWA (setbook.pro) for shared chord/lyrics library management — built for live musicians to view, manage, and sync songs on stage. Note: the workspace package and directory name remain `songbook`; only the user-facing brand is "Set Book Pro".
 
 ## Run & Operate
 

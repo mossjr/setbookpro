@@ -38,7 +38,7 @@ export function exportLibrary(songs: Song[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `songbook-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `setbook-pro-export-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

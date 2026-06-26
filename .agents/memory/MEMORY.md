@@ -5,3 +5,4 @@
 - [Radix popover trigger gotcha](radix-popover-and-testing.md) — a child onClick on `PopoverTrigger asChild` can block open (popover never opens, even on DOM .click); use controlled Popover + PopoverAnchor instead
 - [Radix ScrollArea breaks truncate](radix-scrollarea-truncate.md) — Viewport child is display:table, sizes to widest row, defeats truncate & pushes siblings off-screen
 - [SongBook optimistic set mutations](songbook-optimistic-set-mutations.md) — reorder/remove share a monotonic token guard so out-of-order responses can't clobber newer state
+- [Songbook asset imports](songbook-assets-imports.md) — `@assets` imports fail typecheck (no tsconfig path/png decl); copy to `public/` and use a root URL instead

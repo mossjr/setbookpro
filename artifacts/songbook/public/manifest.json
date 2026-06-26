@@ -1,6 +1,6 @@
 {
-  "name": "SongBook",
-  "short_name": "SongBook",
+  "name": "Set Book Pro",
+  "short_name": "Set Book Pro",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
