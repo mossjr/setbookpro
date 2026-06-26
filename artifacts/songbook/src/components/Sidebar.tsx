@@ -580,24 +580,26 @@ export default function Sidebar() {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 rounded-md bg-primary/10 border border-primary/30 p-2.5">
-                    <ListMusic className="w-4 h-4 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] uppercase tracking-wide text-primary font-semibold">
-                        Playing set
-                      </div>
-                      <div className="font-semibold truncate text-foreground">
-                        {activeSet.title}
+                  <div className="rounded-md bg-primary/10 border border-primary/30 p-2.5 space-y-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <ListMusic className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wide text-primary font-semibold">
+                          Playing set
+                        </div>
+                        <div className="font-semibold text-foreground break-words">
+                          {activeSet.title}
+                        </div>
                       </div>
                     </div>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-muted-foreground shrink-0"
+                      className="h-7 w-full justify-center text-muted-foreground"
                       onClick={() => setActiveSetId(null)}
                       title="Exit set"
                     >
-                      <X className="w-4 h-4 mr-1" /> Exit
+                      <X className="w-4 h-4 mr-1" /> Exit set
                     </Button>
                   </div>
 

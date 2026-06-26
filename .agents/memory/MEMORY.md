@@ -3,3 +3,4 @@
 - [rAF scroll sub-pixel accumulator](scroll-subpixel-accumulator.md) — slow auto-scroll stalls if you read scrollTop back each frame; use a float accumulator
 - [UG shared-playlist import](ug-playlist-import.md) — UG share links are Cloudflare-walled; need a JS-rendering scraper (Firecrawl) to read them server-side
 - [Radix popover trigger gotcha](radix-popover-and-testing.md) — a child onClick on `PopoverTrigger asChild` can block open (popover never opens, even on DOM .click); use controlled Popover + PopoverAnchor instead
+- [Radix ScrollArea breaks truncate](radix-scrollarea-truncate.md) — Viewport child is display:table, sizes to widest row, defeats truncate & pushes siblings off-screen
