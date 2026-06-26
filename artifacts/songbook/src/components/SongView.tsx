@@ -47,7 +47,14 @@ import {
   SkipForward,
   Star,
   Radio,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Horizontal safe zones so song content never renders under floating overlays.
 // Left clears the collapsed-sidebar reveal tab (Layout.tsx, w-7 ≈ 28px); only
@@ -524,6 +531,7 @@ export default function SongView({ songId }: { songId: string }) {
           <Button
             variant="ghost"
             size="icon"
+            className="hidden md:inline-flex"
             onClick={() => applyLyricsOnly(!effectiveLyricsOnly)}
             title="Lyrics Only"
           >
@@ -536,6 +544,7 @@ export default function SongView({ songId }: { songId: string }) {
             <Button
               variant="ghost"
               size="icon"
+              className="hidden md:inline-flex"
               onClick={toggleBookmark}
               title={isBookmarked ? "Clear Last Played" : "Mark as Last Played"}
               aria-label="Last Played"
@@ -549,6 +558,7 @@ export default function SongView({ songId }: { songId: string }) {
           <Button
             variant="ghost"
             size="icon"
+            className="hidden md:inline-flex"
             onClick={toggleHost}
             title={isHost ? "Stop hosting" : "Host this session"}
             aria-label={isHost ? "Stop hosting" : "Host this session"}
@@ -558,6 +568,44 @@ export default function SongView({ songId }: { songId: string }) {
               className={`w-5 h-5 ${isHost ? "text-primary" : "text-muted-foreground"}`}
             />
           </Button>
+
+          {/* Mobile overflow — Eye/Star/Radio don't fit on narrow phones */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="More options"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => applyLyricsOnly(!effectiveLyricsOnly)}
+              >
+                <Eye
+                  className={`w-4 h-4 mr-2 shrink-0 ${effectiveLyricsOnly ? "text-primary" : ""}`}
+                />
+                Lyrics only{effectiveLyricsOnly ? " ✓" : ""}
+              </DropdownMenuItem>
+              {!isParticipant && (
+                <DropdownMenuItem onClick={toggleBookmark}>
+                  <Star
+                    className={`w-4 h-4 mr-2 shrink-0 ${isBookmarked ? "text-primary fill-primary" : ""}`}
+                  />
+                  {isBookmarked ? "Clear Last Played" : "Mark as Last Played"}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={toggleHost}>
+                <Radio
+                  className={`w-4 h-4 mr-2 shrink-0 ${isHost ? "text-primary" : ""}`}
+                />
+                {isHost ? "Stop hosting" : "Host this session"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <SettingsDialog />
         </div>
