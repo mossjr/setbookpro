@@ -14,6 +14,8 @@ import {
   useGetSongStats,
   getGetSongStatsQueryKey,
   useCreateSet,
+  useDeleteSet,
+  useUpdateSet,
   useDeleteSong,
   useAddSongToSet,
   useCreateSong,
@@ -126,6 +128,8 @@ export default function Sidebar() {
   });
 
   const createSetMutation = useCreateSet();
+  const deleteSet = useDeleteSet();
+  const updateSet = useUpdateSet();
   const deleteSong = useDeleteSong();
   const addSongToSet = useAddSongToSet();
   const createSong = useCreateSong();
@@ -255,6 +259,32 @@ export default function Sidebar() {
       invalidateSongs();
     } catch {
       toast({ title: "Could not delete song", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSet = async (setId: string, setTitle: string) => {
+    if (!confirm(`Delete "${setTitle}"? This cannot be undone.`)) return;
+    try {
+      await deleteSet.mutateAsync({ id: setId });
+      toast({ title: "Set deleted" });
+      qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetSongStatsQueryKey() });
+    } catch {
+      toast({ title: "Could not delete set", variant: "destructive" });
+    }
+  };
+
+  const handleRenameSet = async (setId: string, currentTitle: string) => {
+    const newTitle = prompt("Rename set:", currentTitle);
+    if (!newTitle || newTitle.trim() === "" || newTitle.trim() === currentTitle)
+      return;
+    try {
+      await updateSet.mutateAsync({ id: setId, data: { title: newTitle.trim() } });
+      toast({ title: "Set renamed" });
+      qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetSetQueryKey(setId) });
+    } catch {
+      toast({ title: "Could not rename set", variant: "destructive" });
     }
   };
 
@@ -977,16 +1007,48 @@ export default function Sidebar() {
                 return (
                   <div className="space-y-1">
                     {filtered.map((set) => (
-                      <Link
-                        href={`/sets/${set.id}`}
+                      <div
                         key={set.id}
-                        className="block w-full text-left p-3 rounded-md transition-colors hover:bg-sidebar-accent text-foreground border border-transparent hover:border-sidebar-border"
+                        className="group flex items-center rounded-md border border-transparent hover:bg-sidebar-accent hover:border-sidebar-border transition-colors"
                       >
-                        <div className="font-semibold truncate">{set.title}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {set.songCount} songs
+                        <Link
+                          href={`/sets/${set.id}`}
+                          className="flex-1 min-w-0 p-3 text-left text-foreground"
+                        >
+                          <div className="font-semibold truncate">{set.title}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {set.songCount} songs
+                          </div>
+                        </Link>
+                        <div className="shrink-0 pr-1">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                aria-label="Set actions"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleRenameSet(set.id, set.title)}
+                              >
+                                <Pencil className="w-3.5 h-3.5 mr-2" /> Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => handleDeleteSet(set.id, set.title)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 );
