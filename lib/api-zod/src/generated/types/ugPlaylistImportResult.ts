@@ -7,7 +7,8 @@
  */
 
 export interface UgPlaylistImportResult {
-  setId: string;
+  /** @nullable */
+  setId: string | null;
   imported: number;
   addedExisting: number;
   skipped: number;

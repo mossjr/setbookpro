@@ -303,10 +303,12 @@ export interface UgPlaylistImportItem {
 
 export interface UgPlaylistImportInput {
   /**
-     * @minLength 1
      * @maxLength 200
+     * @nullable
      */
-  setName: string;
+  setName?: string | null;
+  /** @nullable */
+  setId?: string | null;
   /**
      * @minItems 1
      * @maxItems 2000
@@ -315,7 +317,8 @@ export interface UgPlaylistImportInput {
 }
 
 export interface UgPlaylistImportResult {
-  setId: string;
+  /** @nullable */
+  setId: string | null;
   imported: number;
   addedExisting: number;
   skipped: number;

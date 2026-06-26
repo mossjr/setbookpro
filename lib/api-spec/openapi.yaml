@@ -1139,12 +1139,13 @@ components:
 
     UgPlaylistImportInput:
       type: object
-      required: [setName, items]
+      required: [items]
       properties:
         setName:
-          type: string
-          minLength: 1
+          type: ["string", "null"]
           maxLength: 200
+        setId:
+          type: ["string", "null"]
         items:
           type: array
           minItems: 1
@@ -1157,7 +1158,7 @@ components:
       required: [setId, imported, addedExisting, skipped]
       properties:
         setId:
-          type: string
+          type: ["string", "null"]
         imported:
           type: integer
         addedExisting:

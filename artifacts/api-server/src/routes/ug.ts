@@ -182,12 +182,6 @@ router.post(
       return;
     }
 
-    const setName = parsed.data.setName.trim();
-    if (!setName) {
-      res.status(400).json({ error: "Set name is required" });
-      return;
-    }
-
     // Dedupe incoming items by tabId, preserving playlist order.
     const seenTab = new Set<string>();
     const items = parsed.data.items.filter((it) => {
@@ -201,14 +195,32 @@ router.post(
       return;
     }
 
-    // Find or create the target set by name.
-    let set = await db.query.setsTable.findFirst({
-      where: eq(setsTable.title, setName),
-    });
-    if (!set) {
-      [set] = await db.insert(setsTable).values({ title: setName }).returning();
+    // Resolve the destination set, if any. Priority: explicit setId, then a
+    // non-blank setName (find-or-create), otherwise library-only (no set).
+    let setId: string | null = null;
+    const requestedSetId = parsed.data.setId?.trim() || null;
+    const requestedSetName = parsed.data.setName?.trim() || null;
+    if (requestedSetId) {
+      const existingSet = await db.query.setsTable.findFirst({
+        where: eq(setsTable.id, requestedSetId),
+      });
+      if (!existingSet) {
+        res.status(404).json({ error: "Set not found" });
+        return;
+      }
+      setId = existingSet.id;
+    } else if (requestedSetName) {
+      let set = await db.query.setsTable.findFirst({
+        where: eq(setsTable.title, requestedSetName),
+      });
+      if (!set) {
+        [set] = await db
+          .insert(setsTable)
+          .values({ title: requestedSetName })
+          .returning();
+      }
+      setId = set.id;
     }
-    const setId = set.id;
 
     // Existing library songs already keyed by their UG tab id.
     const tabIds = items.map((it) => it.tabId);
@@ -258,22 +270,27 @@ router.post(
       }
     });
 
-    // Add resolved songs to the set in playlist order.
-    const [maxRow] = await db
-      .select({
-        max: sql<number>`coalesce(max(${setSongsTable.sortOrder}), -1)::int`,
-      })
-      .from(setSongsTable)
-      .where(eq(setSongsTable.setId, setId));
-    let order = (maxRow?.max ?? -1) + 1;
+    // Add resolved songs to the set in playlist order (when a set is targeted).
+    let order = 0;
+    if (setId) {
+      const [maxRow] = await db
+        .select({
+          max: sql<number>`coalesce(max(${setSongsTable.sortOrder}), -1)::int`,
+        })
+        .from(setSongsTable)
+        .where(eq(setSongsTable.setId, setId));
+      order = (maxRow?.max ?? -1) + 1;
+    }
 
     for (const r of resolved) {
       if (!r) continue;
-      await db
-        .insert(setSongsTable)
-        .values({ setId, songId: r.songId, sortOrder: order })
-        .onConflictDoNothing();
-      order++;
+      if (setId) {
+        await db
+          .insert(setSongsTable)
+          .values({ setId, songId: r.songId, sortOrder: order })
+          .onConflictDoNothing();
+        order++;
+      }
       if (r.isNew) imported++;
       else addedExisting++;
     }

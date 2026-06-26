@@ -4,3 +4,4 @@
 - [UG shared-playlist import](ug-playlist-import.md) — UG share links are Cloudflare-walled; need a JS-rendering scraper (Firecrawl) to read them server-side
 - [Radix popover trigger gotcha](radix-popover-and-testing.md) — a child onClick on `PopoverTrigger asChild` can block open (popover never opens, even on DOM .click); use controlled Popover + PopoverAnchor instead
 - [Radix ScrollArea breaks truncate](radix-scrollarea-truncate.md) — Viewport child is display:table, sizes to widest row, defeats truncate & pushes siblings off-screen
+- [SongBook optimistic set mutations](songbook-optimistic-set-mutations.md) — reorder/remove share a monotonic token guard so out-of-order responses can't clobber newer state

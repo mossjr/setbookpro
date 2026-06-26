@@ -7,8 +7,15 @@ import {
   useUgImportTab,
   useUgPlaylistPreview,
   useUgPlaylistImport,
+  useCreateSet,
+  useAddSongToSet,
+  getListSongsQueryKey,
+  getGetSongStatsQueryKey,
+  getListSetsQueryKey,
+  getGetSetQueryKey,
   type UgPlaylistPreview,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +25,13 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
+import {
+  ImportDestinationPicker,
+  emptyDestination,
+  isDestinationReady,
+  destinationPayload,
+  type DestinationState,
+} from "@/components/ImportDestinationPicker";
 
 interface TabSummary {
   id: string;
@@ -47,37 +61,91 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
-function TabPreview({ tabId, onClose, onImported }: { tabId: string; onClose: () => void; onImported: (songId: string) => void }) {
+function TabPreview({
+  tabId,
+  onClose,
+  onImported,
+  onAddedToSet,
+}: {
+  tabId: string;
+  onClose: () => void;
+  onImported: (songId: string) => void;
+  onAddedToSet: (setId: string) => void;
+}) {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const importMutation = useUgImportTab();
+  const createSet = useCreateSet();
+  const addSongToSet = useAddSongToSet();
+  const [dest, setDest] = useState<DestinationState>(emptyDestination());
 
   const { data: tab, isLoading, error } = useUgGetTab(
     tabId,
     { query: { queryKey: getUgGetTabQueryKey(tabId), enabled: !!tabId } },
   );
 
-  const handleImport = () => {
-    if (!tab) return;
-    importMutation.mutate(
-      {
+  const busy =
+    importMutation.isPending || createSet.isPending || addSongToSet.isPending;
+  const ready = !!tab && isDestinationReady(dest);
+
+  const invalidateLibrary = () => {
+    qc.invalidateQueries({ queryKey: getListSongsQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetSongStatsQueryKey() });
+  };
+
+  const handleImport = async () => {
+    if (!tab || !ready) return;
+    try {
+      const song = await importMutation.mutateAsync({
         data: {
           ugId: tab.id,
           title: tab.title,
           artist: tab.artist,
           lyricsChords: tab.lyricsChords,
         },
-      },
-      {
-        onSuccess: (song) => {
-          toast({ title: `"${tab.title}" added to library` });
-          onImported(song.id);
-        },
-        onError: () => {
-          toast({ variant: "destructive", title: "Import failed", description: "Could not save this tab." });
-        },
-      },
-    );
+      });
+
+      if (dest.mode === "existing") {
+        await addSongToSet.mutateAsync({
+          id: dest.existingSetId,
+          data: { songId: song.id },
+        });
+        invalidateLibrary();
+        qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetSetQueryKey(dest.existingSetId) });
+        toast({ title: `"${tab.title}" added to set` });
+        onAddedToSet(dest.existingSetId);
+      } else if (dest.mode === "new") {
+        const newSet = await createSet.mutateAsync({
+          data: { title: dest.newName.trim() },
+        });
+        await addSongToSet.mutateAsync({
+          id: newSet.id,
+          data: { songId: song.id },
+        });
+        invalidateLibrary();
+        qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
+        toast({ title: `"${tab.title}" added to "${newSet.title}"` });
+        onAddedToSet(newSet.id);
+      } else {
+        invalidateLibrary();
+        toast({ title: `"${tab.title}" added to library` });
+        onImported(song.id);
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Import failed",
+        description: "Could not save this tab.",
+      });
+    }
   };
+
+  const buttonLabel = busy
+    ? "Saving..."
+    : dest.mode === "library"
+      ? "Add to Library"
+      : "Add to set";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -95,18 +163,19 @@ function TabPreview({ tabId, onClose, onImported }: { tabId: string; onClose: ()
             <div className="text-muted-foreground">Loading preview...</div>
           )}
         </div>
-        <Button
-          onClick={handleImport}
-          disabled={!tab || importMutation.isPending}
-          className="shrink-0"
-        >
+        <Button onClick={handleImport} disabled={!ready || busy} className="shrink-0">
           <Check className="w-4 h-4 mr-2" />
-          {importMutation.isPending ? "Saving..." : "Add to Library"}
+          {buttonLabel}
         </Button>
       </header>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 max-w-2xl mx-auto">
+        <div className="p-4 max-w-2xl mx-auto space-y-4">
+          {tab && (
+            <div className="rounded-lg border border-border p-4 bg-card">
+              <ImportDestinationPicker value={dest} onChange={setDest} />
+            </div>
+          )}
           {isLoading && (
             <div className="text-center py-16 text-muted-foreground">Fetching tab...</div>
           )}
@@ -124,7 +193,13 @@ function TabPreview({ tabId, onClose, onImported }: { tabId: string; onClose: ()
   );
 }
 
-function SearchImport({ onImported }: { onImported: (songId: string) => void }) {
+function SearchImport({
+  onImported,
+  onAddedToSet,
+}: {
+  onImported: (songId: string) => void;
+  onAddedToSet: (setId: string) => void;
+}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -154,6 +229,7 @@ function SearchImport({ onImported }: { onImported: (songId: string) => void }) 
           tabId={previewId}
           onClose={() => setPreviewId(null)}
           onImported={(songId) => { setPreviewId(null); onImported(songId); }}
+          onAddedToSet={(setId) => { setPreviewId(null); onAddedToSet(setId); }}
         />
       )}
 
@@ -268,10 +344,11 @@ function SearchImport({ onImported }: { onImported: (songId: string) => void }) 
   );
 }
 
-function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
+function PlaylistImport({ onDone }: { onDone: (setId: string | null) => void }) {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [url, setUrl] = useState("");
-  const [setName, setSetName] = useState("");
+  const [dest, setDest] = useState<DestinationState>(emptyDestination());
   const [preview, setPreview] = useState<UgPlaylistPreview | null>(null);
 
   const previewMutation = useUgPlaylistPreview();
@@ -287,7 +364,8 @@ function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
       {
         onSuccess: (data) => {
           setPreview(data);
-          setSetName(data.playlistName);
+          // Default to creating a new set named after the playlist.
+          setDest({ mode: "new", existingSetId: "", newName: data.playlistName });
         },
         onError: () => {
           toast({
@@ -301,8 +379,7 @@ function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
   };
 
   const handleImport = () => {
-    if (!preview) return;
-    const name = setName.trim() || preview.playlistName || "Imported playlist";
+    if (!preview || !isDestinationReady(dest)) return;
     const items = preview.items.map((it) => ({
       tabId: it.tabId,
       title: it.title,
@@ -310,11 +387,18 @@ function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
       existingSongId: it.existingSongId ?? null,
     }));
     importMutation.mutate(
-      { data: { setName: name, items } },
+      { data: { ...destinationPayload(dest), items } },
       {
         onSuccess: (result) => {
+          qc.invalidateQueries({ queryKey: getListSongsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetSongStatsQueryKey() });
+          qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
+          if (result.setId)
+            qc.invalidateQueries({ queryKey: getGetSetQueryKey(result.setId) });
+          const where =
+            dest.mode === "library" ? "your library" : "the set";
           toast({
-            title: `Imported into "${name}"`,
+            title: `Imported into ${where}`,
             description:
               `${result.imported} new, ${result.addedExisting} already in library` +
               (result.skipped ? `, ${result.skipped} skipped` : "") + ".",
@@ -354,7 +438,7 @@ function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
           </Button>
         </form>
         <p className="text-xs text-muted-foreground">
-          In Ultimate Guitar, open a playlist, tap Share, and paste the link here. We'll scan it and import every song into a set.
+          In Ultimate Guitar, open a playlist, tap Share, and paste the link here. We'll scan it and you choose where the songs go.
         </p>
       </div>
 
@@ -373,7 +457,7 @@ function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
 
           {preview && (
             <div className="space-y-4">
-              <div className="rounded-lg border border-border p-4 bg-card space-y-3">
+              <div className="rounded-lg border border-border p-4 bg-card space-y-4">
                 <div>
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">Playlist</div>
                   <div className="font-bold text-lg leading-tight">
@@ -393,22 +477,13 @@ function PlaylistImport({ onDone }: { onDone: (setId: string) => void }) {
                   </span>
                 </div>
 
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Set name</label>
-                  <Input
-                    value={setName}
-                    onChange={(e) => setSetName(e.target.value)}
-                    className="mt-1"
-                    placeholder="Name this set"
-                  />
-                  {preview.setExists && (
-                    <p className="text-xs text-amber-400 mt-1">
-                      A set with this name already exists — songs will be added to it.
-                    </p>
-                  )}
-                </div>
+                <ImportDestinationPicker value={dest} onChange={setDest} />
 
-                <Button onClick={handleImport} disabled={importing} className="w-full">
+                <Button
+                  onClick={handleImport}
+                  disabled={importing || !isDestinationReady(dest)}
+                  className="w-full"
+                >
                   {importing ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importing… this can take a minute</>
                   ) : (
@@ -494,9 +569,14 @@ export default function ImportPage() {
       </div>
 
       {mode === "search" ? (
-        <SearchImport onImported={handleImported} />
+        <SearchImport
+          onImported={handleImported}
+          onAddedToSet={(setId) => setLocation(`/sets/${setId}`)}
+        />
       ) : (
-        <PlaylistImport onDone={(setId) => setLocation(`/sets/${setId}`)} />
+        <PlaylistImport
+          onDone={(setId) => setLocation(setId ? `/sets/${setId}` : "/")}
+        />
       )}
     </div>
   );

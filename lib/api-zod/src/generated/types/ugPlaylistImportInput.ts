@@ -9,10 +9,12 @@ import type { UgPlaylistImportItem } from './ugPlaylistImportItem';
 
 export interface UgPlaylistImportInput {
   /**
-     * @minLength 1
      * @maxLength 200
+     * @nullable
      */
-  setName: string;
+  setName?: string | null;
+  /** @nullable */
+  setId?: string | null;
   /**
      * @minItems 1
      * @maxItems 2000

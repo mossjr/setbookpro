@@ -565,7 +565,8 @@ export const ugPlaylistImportBodyItemsMax = 2000;
 
 
 export const UgPlaylistImportBody = zod.object({
-  "setName": zod.string().min(1).max(ugPlaylistImportBodySetNameMax),
+  "setName": zod.string().max(ugPlaylistImportBodySetNameMax).nullish(),
+  "setId": zod.string().nullish(),
   "items": zod.array(zod.object({
   "tabId": zod.string().max(ugPlaylistImportBodyItemsItemTabIdMax).regex(ugPlaylistImportBodyItemsItemTabIdRegExp),
   "title": zod.string().max(ugPlaylistImportBodyItemsItemTitleMax),
@@ -575,7 +576,7 @@ export const UgPlaylistImportBody = zod.object({
 })
 
 export const UgPlaylistImportResponse = zod.object({
-  "setId": zod.string(),
+  "setId": zod.string().nullable(),
   "imported": zod.number(),
   "addedExisting": zod.number(),
   "skipped": zod.number()
