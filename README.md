@@ -21,13 +21,21 @@ A full-stack Progressive Web App for shared chord/lyrics library management — 
 
 ---
 
+> ### ⚠️ Single-password app — not multi-tenant
+> Set Book Pro has **no user accounts**. Everyone who accesses your deployment uses the **same shared password** to log in. This is intentional — it's designed for a band or group of musicians who all share one library and set list. You **must** set a strong `APP_PASSWORD` secret before deploying, then share your deployed URL and that password with your bandmates. Do not use a password you use elsewhere.
+
+---
+
 ## Deploying on Replit
 
-### 1. Fork or import the repo into Replit
+### 1. Upload the project to Replit
 
-1. Go to [replit.com](https://replit.com) and create a new Repl
-2. Choose **Import from GitHub** and paste this repo's URL
-3. Replit will detect the pnpm workspace and set up the environment
+> **Do not use "Fork" or "Import from GitHub"** — upload the zip directly so you get your own fully independent copy.
+
+1. Download this repo as a zip file: click the green **Code** button on GitHub → **Download ZIP**
+2. Go to [replit.com](https://replit.com) and click **Create Repl**
+3. Choose **Upload** (not a template), and upload the zip file you just downloaded
+4. Replit will extract and set up the workspace automatically
 
 ---
 
