@@ -47,6 +47,7 @@ import {
   Square,
   Trash2,
   Pencil,
+  MoreVertical,
   ListPlus,
   X,
   PanelLeftClose,
@@ -531,23 +532,33 @@ export default function Sidebar() {
                                 <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
                               )}
                               {!selectMode && (
-                                <div className="flex shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8"
-                                    onClick={() => openEditSong(song)}
-                                  >
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8"
-                                    onClick={() => handleDeleteSong(song)}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                                  </Button>
+                                <div className="flex shrink-0">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        aria-label="Song actions"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={() => openEditSong(song)}
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => handleDeleteSong(song)}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               )}
                             </div>
@@ -582,7 +593,7 @@ export default function Sidebar() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-muted-foreground"
+                      className="h-7 px-2 text-muted-foreground shrink-0"
                       onClick={() => setActiveSetId(null)}
                       title="Exit set"
                     >

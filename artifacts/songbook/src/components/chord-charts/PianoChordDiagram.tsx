@@ -56,7 +56,7 @@ export default function PianoChordDiagram({
           width={whiteW}
           height={whiteH}
           rx={2}
-          fill={active.has(pc) ? accent : "hsl(var(--card))"}
+          fill={active.has(pc) ? accent : "#ffffff"}
           stroke="hsl(var(--border))"
           strokeWidth={1}
         />
@@ -87,7 +87,7 @@ export default function PianoChordDiagram({
             width={blackW}
             height={blackH}
             rx={1.5}
-            fill={active.has(bk.pc) ? accent : "hsl(var(--muted-foreground))"}
+            fill={active.has(bk.pc) ? accent : "#222222"}
             stroke="hsl(var(--border))"
             strokeWidth={0.5}
           />
