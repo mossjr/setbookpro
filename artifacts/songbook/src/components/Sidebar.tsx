@@ -373,7 +373,7 @@ export default function Sidebar() {
           <SlidersHorizontal className="w-4 h-4" />
           {filterCount > 0 && (
             <Badge className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] justify-center rounded-full px-1 text-[10px]">
-              {filterCount}
+              {filteredSongs.length}
             </Badge>
           )}
         </Button>
