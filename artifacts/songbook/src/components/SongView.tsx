@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   useGetSong,
   getGetSongQueryKey,
@@ -15,6 +15,8 @@ import {
   hostScrollStop,
 } from "@/lib/gig";
 import ChordRenderer from "./ChordRenderer";
+import ChordChartStrip from "./chord-charts/ChordChartStrip";
+import { extractUniqueChords } from "@/lib/chords";
 import Metronome from "./Metronome";
 import MediaPlayerModal from "./MediaPlayerModal";
 import ScrollScrubber from "./ScrollScrubber";
@@ -79,8 +81,17 @@ export default function SongView({ songId }: { songId: string }) {
     setLastPlayedSongId,
   } = useAppStore();
 
-  const { titleFontSize, lyricsFontSize, chordsFontSize, accentColor } =
-    useSettingsStore();
+  const {
+    titleFontSize,
+    lyricsFontSize,
+    chordsFontSize,
+    accentColor,
+    instrument,
+    setInstrument,
+    showChordStrip,
+    freezeChordStrip,
+    setFreezeChordStrip,
+  } = useSettingsStore();
 
   // --- Live gig role ------------------------------------------------------
   const role = useGigStore((s) => s.role);
@@ -115,6 +126,15 @@ export default function SongView({ songId }: { songId: string }) {
   const [transpose, setTranspose] = useState(0);
   // Participants render at the host's transpose; everyone else uses their own.
   const effectiveTranspose = isParticipant ? hostTranspose : transpose;
+
+  // Unique chords in the song (already transposed), for the chord-chart strip.
+  const stripChords = useMemo(
+    () => extractUniqueChords(song?.lyricsChords ?? "", effectiveTranspose),
+    [song?.lyricsChords, effectiveTranspose],
+  );
+  const stripVisible =
+    showChordStrip && stripChords.length > 0 && !effectiveLyricsOnly;
+
   const [mediaOpen, setMediaOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -173,7 +193,7 @@ export default function SongView({ songId }: { songId: string }) {
     measureRef,
     safeLeft,
     safeRight,
-    recomputeKey: `${song?.id ?? ""}|${effectiveTranspose}|${effectiveLyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}|${userZoom}|${displayMode}`,
+    recomputeKey: `${song?.id ?? ""}|${effectiveTranspose}|${effectiveLyricsOnly ? 1 : 0}|${lyricsFontSize}|${chordsFontSize}|${userZoom}|${displayMode}|${stripVisible ? 1 : 0}|${freezeChordStrip ? 1 : 0}|${instrument}`,
   });
 
   const isSplit = layout.effectiveMode === "split";
@@ -403,6 +423,15 @@ export default function SongView({ songId }: { songId: string }) {
   // solo/idle users, and participants when the host is paging) keep one.
   const showScrubber = !isSplit && !participantFollows;
 
+  // Chord-chart strip placement: pinned above the frame when frozen or in split
+  // (so it stays visible), otherwise it scrolls inline within the song body.
+  const stripAbove = stripVisible && (freezeChordStrip || isSplit);
+  const stripInScroll = stripVisible && !freezeChordStrip && !isSplit;
+
+  const toggleInstrument = () =>
+    setInstrument(instrument === "guitar" ? "piano" : "guitar");
+  const toggleFreezeStrip = () => setFreezeChordStrip(!freezeChordStrip);
+
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Top Bar */}
@@ -562,6 +591,17 @@ export default function SongView({ songId }: { songId: string }) {
         />
       )}
 
+      {/* Chord-chart strip, pinned above the song body (frozen or split). */}
+      {stripAbove && (
+        <ChordChartStrip
+          chords={stripChords}
+          instrument={instrument}
+          onToggleInstrument={toggleInstrument}
+          frozen={freezeChordStrip}
+          onToggleFrozen={toggleFreezeStrip}
+        />
+      )}
+
       {/* Song Body — a stable measured frame that hosts either the scroll
           viewport or the paginated split pager. Tapping the song collapses the
           desktop sidebar so the music can fill the screen. */}
@@ -658,6 +698,17 @@ export default function SongView({ songId }: { songId: string }) {
             }}
           >
             <div ref={scrollContentRef}>
+              {stripInScroll && (
+                <div className="mb-3">
+                  <ChordChartStrip
+                    chords={stripChords}
+                    instrument={instrument}
+                    onToggleInstrument={toggleInstrument}
+                    frozen={freezeChordStrip}
+                    onToggleFrozen={toggleFreezeStrip}
+                  />
+                </div>
+              )}
               <ChordRenderer
                 text={song.lyricsChords}
                 zoom={layout.effectiveZoom}
@@ -666,6 +717,8 @@ export default function SongView({ songId }: { songId: string }) {
                 lyricsFontSize={lyricsFontSize}
                 chordsFontSize={chordsFontSize}
                 accentColor={accentColor}
+                instrument={instrument}
+                enablePopover
               />
             </div>
           </div>

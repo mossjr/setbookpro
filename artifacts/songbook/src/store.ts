@@ -4,6 +4,8 @@ import type { HostMode, PresentState, SyncState } from '@workspace/gig-protocol'
 
 type DisplayMode = 'scroll' | 'split' | 'auto';
 
+export type Instrument = 'guitar' | 'piano';
+
 interface SettingsState {
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -15,8 +17,13 @@ interface SettingsState {
   setLyricsFontSize: (size: number) => void;
   chordsFontSize: number;
   setChordsFontSize: (size: number) => void;
-  instrument: 'guitar' | 'piano';
-  setInstrument: (inst: 'guitar' | 'piano') => void;
+  instrument: Instrument;
+  setInstrument: (inst: Instrument) => void;
+  // Chord charts (diagram strip + tap-to-view popovers).
+  showChordStrip: boolean;
+  setShowChordStrip: (on: boolean) => void;
+  freezeChordStrip: boolean;
+  setFreezeChordStrip: (on: boolean) => void;
   // Auto-scroll (px per second).
   autoScrollSpeed: number;
   setAutoScrollSpeed: (speed: number) => void;
@@ -80,6 +87,10 @@ export const useSettingsStore = create<SettingsState>()(
       setChordsFontSize: (chordsFontSize) => set({ chordsFontSize }),
       instrument: 'guitar',
       setInstrument: (instrument) => set({ instrument }),
+      showChordStrip: true,
+      setShowChordStrip: (showChordStrip) => set({ showChordStrip }),
+      freezeChordStrip: true,
+      setFreezeChordStrip: (freezeChordStrip) => set({ freezeChordStrip }),
       autoScrollSpeed: 40,
       setAutoScrollSpeed: (autoScrollSpeed) =>
         set((s) => ({
@@ -127,7 +138,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'songbook-settings',
-      version: 1,
+      version: 2,
       // Ensure a previously-persisted speed range is internally consistent and
       // that the base (1×) speed sits within [min, max] on rehydration.
       migrate: (persisted, _version) => {
@@ -143,6 +154,11 @@ export const useSettingsStore = create<SettingsState>()(
           s.autoScrollMaxSpeed = max;
           if (typeof s.autoScrollSpeed === 'number') {
             s.autoScrollSpeed = Math.min(Math.max(s.autoScrollSpeed, min), max);
+          }
+          if (typeof s.showChordStrip !== 'boolean') s.showChordStrip = true;
+          if (typeof s.freezeChordStrip !== 'boolean') s.freezeChordStrip = true;
+          if (s.instrument !== 'guitar' && s.instrument !== 'piano') {
+            s.instrument = 'guitar';
           }
         }
         return s as SettingsState;

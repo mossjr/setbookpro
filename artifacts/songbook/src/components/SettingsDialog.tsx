@@ -18,6 +18,8 @@ import {
   AlignLeft,
   Columns,
   Wand2,
+  Guitar,
+  Piano,
 } from "lucide-react";
 
 const ACCENT_PRESETS: { name: string; value: string }[] = [
@@ -42,6 +44,10 @@ export default function SettingsDialog() {
     setLyricsFontSize,
     chordsFontSize,
     setChordsFontSize,
+    instrument,
+    setInstrument,
+    showChordStrip,
+    setShowChordStrip,
     autoScrollSpeed,
     setAutoScrollSpeed,
     autoScrollMinSpeed,
@@ -183,6 +189,37 @@ export default function SettingsDialog() {
               step={1}
               onValueChange={([val]) => setChordsFontSize(val)}
             />
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Chord charts */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="show-chord-charts">Show chord charts</Label>
+            <Switch
+              id="show-chord-charts"
+              checked={showChordStrip}
+              onCheckedChange={setShowChordStrip}
+            />
+          </div>
+          <div className="space-y-3">
+            <Label>Chord chart instrument</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={instrument === "guitar" ? "default" : "outline"}
+                onClick={() => setInstrument("guitar")}
+                className="flex-1"
+              >
+                <Guitar className="w-4 h-4 mr-2" /> Guitar
+              </Button>
+              <Button
+                variant={instrument === "piano" ? "default" : "outline"}
+                onClick={() => setInstrument("piano")}
+                className="flex-1"
+              >
+                <Piano className="w-4 h-4 mr-2" /> Piano
+              </Button>
+            </div>
           </div>
 
           <div className="h-px bg-border" />

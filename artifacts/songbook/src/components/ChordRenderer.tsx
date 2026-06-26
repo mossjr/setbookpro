@@ -1,5 +1,7 @@
 import { useMemo } from "react";
-import { transposeLyricsChords } from "@/lib/chords";
+import { transposeLyricsChords, isChordToken } from "@/lib/chords";
+import type { Instrument } from "@/store";
+import ChordPopover from "./chord-charts/ChordPopover";
 
 // ---------------------------------------------------------------------------
 // Parsing
@@ -50,6 +52,8 @@ interface ChordRendererProps {
   lyricsFontSize: number;
   chordsFontSize: number;
   accentColor: string;
+  instrument?: Instrument;
+  enablePopover?: boolean;
 }
 
 export default function ChordRenderer({
@@ -59,6 +63,8 @@ export default function ChordRenderer({
   lyricsOnly,
   lyricsFontSize,
   chordsFontSize,
+  instrument = "guitar",
+  enablePopover = false,
 }: ChordRendererProps) {
   const transposedText = useMemo(
     () => transposeLyricsChords(text, transpose),
@@ -154,20 +160,39 @@ export default function ChordRenderer({
                   }}
                 >
                   {/* ── Chord row ── */}
-                  <span
-                    className={seg.chord ? "text-primary font-bold select-none" : ""}
-                    style={{
+                  {(() => {
+                    const chordClass = seg.chord
+                      ? "text-primary font-bold select-none"
+                      : "";
+                    const chordStyle = {
                       fontSize: chordsSize,
                       lineHeight: 1.3,
                       // nowrap keeps long chord names (e.g. Cmaj7sus4) on one line
-                      whiteSpace: "nowrap",
+                      whiteSpace: "nowrap" as const,
                       // When no chord, emit a non-breaking space to hold the row
                       // height so all lyric baselines stay on the same line.
                       paddingRight: seg.chord ? "0.4em" : 0,
-                    }}
-                  >
-                    {seg.chord ?? "\u00a0"}
-                  </span>
+                    };
+                    const content = seg.chord ?? "\u00a0";
+                    // Tappable chord → diagram popover (scroll mode only).
+                    if (enablePopover && seg.chord && isChordToken(seg.chord)) {
+                      return (
+                        <ChordPopover
+                          symbol={seg.chord}
+                          instrument={instrument}
+                          className={chordClass + " cursor-pointer"}
+                          style={chordStyle}
+                        >
+                          {content}
+                        </ChordPopover>
+                      );
+                    }
+                    return (
+                      <span className={chordClass} style={chordStyle}>
+                        {content}
+                      </span>
+                    );
+                  })()}
 
                   {/* ── Lyric row ── */}
                   <span
