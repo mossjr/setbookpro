@@ -100,6 +100,7 @@ export default function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
+  const [setsSearch, setSetsSearch] = useState("");
   const [activeTab, setActiveTab] = useState("songs");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -692,6 +693,29 @@ export default function Sidebar() {
           </div>
         )}
 
+        {/* Sticky toolbar: sets tab */}
+        {activeTab === "sets" && (
+          <div className="px-4 pt-4 pb-3 space-y-3 shrink-0 border-b border-sidebar-border">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+              <Input
+                placeholder="Search sets..."
+                className="pl-9 bg-background/50 border-sidebar-border h-10"
+                value={setsSearch}
+                onChange={(e) => setSetsSearch(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={handleCreateSet}
+              className="w-full"
+              variant="outline"
+              size="sm"
+            >
+              <Plus className="w-4 h-4 mr-2" /> New Set
+            </Button>
+          </div>
+        )}
+
         {/* Sticky toolbar: songs tab, active set */}
         {activeTab === "songs" && activeSetId && (
           <div className="px-4 pt-4 pb-3 space-y-3 shrink-0 border-b border-sidebar-border">
@@ -931,35 +955,42 @@ export default function Sidebar() {
           )}
 
           {activeTab === "sets" && (
-            <div className="p-4 space-y-4">
-              <Button
-                onClick={handleCreateSet}
-                className="w-full"
-                variant="outline"
-              >
-                <Plus className="w-4 h-4 mr-2" /> New Set
-              </Button>
-
-              <div className="space-y-1">
-                {sets.length === 0 ? (
-                  <div className="text-center p-4 text-muted-foreground text-sm">
-                    No sets yet.
+            <div className="p-4">
+              {(() => {
+                const filtered = sets.filter((s) =>
+                  s.title.toLowerCase().includes(setsSearch.toLowerCase()),
+                );
+                if (sets.length === 0) {
+                  return (
+                    <div className="text-center p-4 text-muted-foreground text-sm">
+                      No sets yet.
+                    </div>
+                  );
+                }
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center p-4 text-muted-foreground text-sm">
+                      No sets match your search.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-1">
+                    {filtered.map((set) => (
+                      <Link
+                        href={`/sets/${set.id}`}
+                        key={set.id}
+                        className="block w-full text-left p-3 rounded-md transition-colors hover:bg-sidebar-accent text-foreground border border-transparent hover:border-sidebar-border"
+                      >
+                        <div className="font-semibold truncate">{set.title}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {set.songCount} songs
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                ) : (
-                  sets.map((set) => (
-                    <Link
-                      href={`/sets/${set.id}`}
-                      key={set.id}
-                      className="block w-full text-left p-3 rounded-md transition-colors hover:bg-sidebar-accent text-foreground border border-transparent hover:border-sidebar-border"
-                    >
-                      <div className="font-semibold truncate">{set.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {set.songCount} songs
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
+                );
+              })()}
             </div>
           )}
 
