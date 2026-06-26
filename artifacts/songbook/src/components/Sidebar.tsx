@@ -97,6 +97,8 @@ export default function Sidebar() {
     lastPlayedSongId,
     filters,
     setFilters,
+    setsSearch,
+    setSetsSearch,
   } = useAppStore();
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
@@ -104,7 +106,6 @@ export default function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
-  const [setsSearch, setSetsSearch] = useState("");
   const [activeTab, setActiveTab] = useState("songs");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

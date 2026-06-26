@@ -73,6 +73,8 @@ interface AppState {
   toggleDesktopSidebar: () => void;
   filters: SongFilterValues;
   setFilters: (filters: SongFilterValues | ((prev: SongFilterValues) => SongFilterValues)) => void;
+  setsSearch: string;
+  setSetsSearch: (search: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -206,6 +208,8 @@ export const useAppStore = create<AppState>()(
               ? filtersOrUpdater(s.filters)
               : filtersOrUpdater,
         })),
+      setsSearch: '',
+      setSetsSearch: (setsSearch) => set({ setsSearch }),
     }),
     {
       name: 'songbook-app-state',
@@ -231,6 +235,7 @@ export const useAppStore = create<AppState>()(
         activeSetId: state.activeSetId,
         lastPlayedSongId: state.lastPlayedSongId,
         filters: state.filters,
+        setsSearch: state.setsSearch,
       }),
     }
   )
