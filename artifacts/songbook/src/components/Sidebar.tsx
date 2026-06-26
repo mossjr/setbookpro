@@ -521,6 +521,41 @@ export default function Sidebar() {
             })}
           </div>
         </div>
+        {tags.length > 0 && (
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Tags
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {tags.map((tag) => {
+                const active = filters.tagIds.includes(tag.id);
+                const color = tag.color ?? "#64748b";
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() =>
+                      setFilters((f) => ({
+                        ...f,
+                        tagIds: active
+                          ? f.tagIds.filter((x) => x !== tag.id)
+                          : [...f.tagIds, tag.id],
+                      }))
+                    }
+                    className="px-2.5 py-1 rounded-full text-xs font-medium border transition"
+                    style={{
+                      backgroundColor: active ? color : `${color}20`,
+                      color: active ? "#fff" : color,
+                      borderColor: `${color}80`,
+                    }}
+                  >
+                    {tag.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

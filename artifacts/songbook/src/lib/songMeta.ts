@@ -28,20 +28,27 @@ export interface SongFilterValues {
   ratingMin: number | null;
   ratingMax: number | null;
   statuses: string[];
+  tagIds: string[];
 }
 
 export const emptyFilters: SongFilterValues = {
   ratingMin: null,
   ratingMax: null,
   statuses: [],
+  tagIds: [],
 };
 
 export const activeFilterCount = (f: SongFilterValues): number =>
   (f.ratingMin != null || f.ratingMax != null ? 1 : 0) +
-  (f.statuses.length > 0 ? 1 : 0);
+  (f.statuses.length > 0 ? 1 : 0) +
+  (f.tagIds.length > 0 ? 1 : 0);
 
 export function songMatchesFilters(
-  song: { rating?: number | null; status?: string | null },
+  song: {
+    rating?: number | null;
+    status?: string | null;
+    tags?: { id: string }[] | null;
+  },
   f: SongFilterValues,
 ): boolean {
   const hasRating = f.ratingMin != null || f.ratingMax != null;
@@ -55,6 +62,10 @@ export function songMatchesFilters(
   }
   if (f.statuses.length > 0 && !f.statuses.includes(song.status ?? "new")) {
     return false;
+  }
+  if (f.tagIds.length > 0) {
+    const songTagIds = new Set((song.tags ?? []).map((t) => t.id));
+    if (!f.tagIds.every((id) => songTagIds.has(id))) return false;
   }
   return true;
 }
