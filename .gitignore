@@ -47,3 +47,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Attached assets (may contain sensitive info from chat)
+attached_assets/
+
+# Environment files
+.env
+.env.*
+!.env.example
