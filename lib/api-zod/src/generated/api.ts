@@ -54,6 +54,10 @@ export const ListSongsQueryParams = zod.object({
   "tagId": zod.coerce.string().optional()
 })
 
+export const listSongsResponseRatingMax = 5;
+
+
+
 export const ListSongsResponseItem = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -68,6 +72,8 @@ export const ListSongsResponseItem = zod.object({
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
   "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(listSongsResponseRatingMax).nullable(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -81,6 +87,10 @@ export const ListSongsResponse = zod.array(ListSongsResponseItem)
 /**
  * @summary Create a new song
  */
+export const createSongBodyRatingMax = 5;
+
+
+
 export const CreateSongBody = zod.object({
   "title": zod.string(),
   "artist": zod.string(),
@@ -88,13 +98,19 @@ export const CreateSongBody = zod.object({
   "lyricsChords": zod.string(),
   "spotifyLink": zod.string().optional(),
   "youtubeUrl": zod.string().optional(),
-  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']).optional()
+  "mediaType": zod.enum(['none', 'audio', 'spotify', 'youtube']).optional(),
+  "rating": zod.number().min(1).max(createSongBodyRatingMax).nullish(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']).optional()
 })
 
 
 /**
  * @summary Get library stats
  */
+export const getSongStatsResponseRecentSongsItemRatingMax = 5;
+
+
+
 export const GetSongStatsResponse = zod.object({
   "totalSongs": zod.number(),
   "totalSets": zod.number(),
@@ -113,6 +129,8 @@ export const GetSongStatsResponse = zod.object({
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
   "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(getSongStatsResponseRecentSongsItemRatingMax).nullable(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -130,6 +148,10 @@ export const GetSongParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const getSongResponseRatingMax = 5;
+
+
+
 export const GetSongResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -144,6 +166,8 @@ export const GetSongResponse = zod.object({
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
   "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(getSongResponseRatingMax).nullable(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -160,6 +184,10 @@ export const UpdateSongParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const updateSongBodyRatingMax = 5;
+
+
+
 export const UpdateSongBody = zod.object({
   "title": zod.string().optional(),
   "artist": zod.string().optional(),
@@ -171,8 +199,14 @@ export const UpdateSongBody = zod.object({
   "audioFileName": zod.string().nullish(),
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
-  "youtubeUrl": zod.string().nullish()
+  "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(updateSongBodyRatingMax).nullish(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']).optional()
 })
+
+export const updateSongResponseRatingMax = 5;
+
+
 
 export const UpdateSongResponse = zod.object({
   "id": zod.string(),
@@ -188,6 +222,8 @@ export const UpdateSongResponse = zod.object({
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
   "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(updateSongResponseRatingMax).nullable(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -216,6 +252,10 @@ export const AddTagToSongBody = zod.object({
   "tagId": zod.string()
 })
 
+export const addTagToSongResponseRatingMax = 5;
+
+
+
 export const AddTagToSongResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -230,6 +270,8 @@ export const AddTagToSongResponse = zod.object({
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
   "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(addTagToSongResponseRatingMax).nullable(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -247,6 +289,10 @@ export const RemoveTagFromSongParams = zod.object({
   "tagId": zod.coerce.string()
 })
 
+export const removeTagFromSongResponseRatingMax = 5;
+
+
+
 export const RemoveTagFromSongResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -261,6 +307,8 @@ export const RemoveTagFromSongResponse = zod.object({
   "audioContentType": zod.string().nullish(),
   "audioSize": zod.number().nullish(),
   "youtubeUrl": zod.string().nullish(),
+  "rating": zod.number().min(1).max(removeTagFromSongResponseRatingMax).nullable(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "createdAt": zod.string(),
   "tags": zod.array(zod.object({
   "id": zod.string(),
@@ -344,6 +392,10 @@ export const GetSetParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const getSetResponseSongsItemRatingMax = 5;
+
+
+
 export const GetSetResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -353,6 +405,8 @@ export const GetSetResponse = zod.object({
   "title": zod.string(),
   "artist": zod.string(),
   "meta": zod.string().nullish(),
+  "rating": zod.number().min(1).max(getSetResponseSongsItemRatingMax).nullish(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "sortOrder": zod.number()
 }))
 })
@@ -396,6 +450,10 @@ export const AddSongToSetBody = zod.object({
   "songId": zod.string()
 })
 
+export const addSongToSetResponseSongsItemRatingMax = 5;
+
+
+
 export const AddSongToSetResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -405,6 +463,8 @@ export const AddSongToSetResponse = zod.object({
   "title": zod.string(),
   "artist": zod.string(),
   "meta": zod.string().nullish(),
+  "rating": zod.number().min(1).max(addSongToSetResponseSongsItemRatingMax).nullish(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "sortOrder": zod.number()
 }))
 })
@@ -418,6 +478,10 @@ export const RemoveSongFromSetParams = zod.object({
   "songId": zod.coerce.string()
 })
 
+export const removeSongFromSetResponseSongsItemRatingMax = 5;
+
+
+
 export const RemoveSongFromSetResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -427,6 +491,8 @@ export const RemoveSongFromSetResponse = zod.object({
   "title": zod.string(),
   "artist": zod.string(),
   "meta": zod.string().nullish(),
+  "rating": zod.number().min(1).max(removeSongFromSetResponseSongsItemRatingMax).nullish(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "sortOrder": zod.number()
 }))
 })
@@ -443,6 +509,10 @@ export const ReorderSetSongsBody = zod.object({
   "songIds": zod.array(zod.string())
 })
 
+export const reorderSetSongsResponseSongsItemRatingMax = 5;
+
+
+
 export const ReorderSetSongsResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -452,6 +522,8 @@ export const ReorderSetSongsResponse = zod.object({
   "title": zod.string(),
   "artist": zod.string(),
   "meta": zod.string().nullish(),
+  "rating": zod.number().min(1).max(reorderSetSongsResponseSongsItemRatingMax).nullish(),
+  "status": zod.enum(['new', 'practicing', 'polishing', 'performance_ready']),
   "sortOrder": zod.number()
 }))
 })

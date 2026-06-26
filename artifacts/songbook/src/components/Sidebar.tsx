@@ -28,12 +28,28 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   Music,
@@ -52,11 +68,21 @@ import {
   X,
   PanelLeftClose,
   Star,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportLibrary, parseImportFile } from "@/lib/importExport";
 import SongEditorDialog from "@/components/SongEditorDialog";
 import TagsManager from "@/components/TagsManager";
+import {
+  STATUS_OPTIONS,
+  statusColor,
+  statusLabel,
+  songMatchesFilters,
+  activeFilterCount,
+  emptyFilters,
+  type SongFilterValues,
+} from "@/lib/songMeta";
 
 export default function Sidebar() {
   const {
@@ -79,6 +105,7 @@ export default function Sidebar() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [filters, setFilters] = useState<SongFilterValues>(emptyFilters);
 
   const { data: songs = [], isLoading: loadingSongs } = useListSongs(
     { search },
@@ -124,8 +151,20 @@ export default function Sidebar() {
     if (activeSetId && activeSetError) setActiveSetId(null);
   }, [activeSetId, activeSetError, setActiveSetId]);
 
+  const filteredSongs = useMemo(
+    () => songs.filter((s) => songMatchesFilters(s, filters)),
+    [songs, filters],
+  );
+
+  const visibleSetSongs = useMemo(() => {
+    if (!activeSet) return [];
+    return activeSet.songs
+      .map((song, i) => ({ song, position: i + 1 }))
+      .filter(({ song }) => songMatchesFilters(song, filters));
+  }, [activeSet, filters]);
+
   const grouped = useMemo(() => {
-    const sorted = [...songs].sort((a, b) =>
+    const sorted = [...filteredSongs].sort((a, b) =>
       a.title.localeCompare(b.title, undefined, { sensitivity: "base" }),
     );
     const map = new Map<string, Song[]>();
@@ -137,7 +176,7 @@ export default function Sidebar() {
       else map.set(key, [s]);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [songs]);
+  }, [filteredSongs]);
 
   const invalidateSongs = () => {
     qc.invalidateQueries({ queryKey: getListSongsQueryKey() });
@@ -175,7 +214,7 @@ export default function Sidebar() {
       return next;
     });
 
-  const displayedIds = songs.map((s) => s.id);
+  const displayedIds = filteredSongs.map((s) => s.id);
   const allSelected =
     displayedIds.length > 0 && displayedIds.every((id) => selected.has(id));
 
@@ -226,6 +265,22 @@ export default function Sidebar() {
       }
       toast({ title: `Added ${selected.size} song(s) to set` });
       exitSelectMode();
+      qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetSetQueryKey(setId) });
+    } catch {
+      toast({ title: "Could not add to set", variant: "destructive" });
+    }
+  };
+
+  const handleAddSongToSet = async (
+    songId: string,
+    setId: string,
+    setTitle: string,
+  ) => {
+    try {
+      await addSongToSet.mutateAsync({ id: setId, data: { songId } });
+      toast({ title: `Added to "${setTitle}"` });
+      qc.invalidateQueries({ queryKey: getGetSetQueryKey(setId) });
       qc.invalidateQueries({ queryKey: getListSetsQueryKey() });
     } catch {
       toast({ title: "Could not add to set", variant: "destructive" });
@@ -302,6 +357,173 @@ export default function Sidebar() {
     }
   };
 
+  const filterCount = activeFilterCount(filters);
+
+  const renderFilters = () => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          size="icon"
+          variant="outline"
+          className="relative h-10 w-10 shrink-0"
+          aria-label="Filter songs"
+          title="Filter songs"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          {filterCount > 0 && (
+            <Badge className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] justify-center rounded-full px-1 text-[10px]">
+              {filterCount}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold">Filters</span>
+          {filterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilters(emptyFilters)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        <div className="space-y-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Star rating
+          </span>
+          <div className="flex items-center gap-2">
+            <Select
+              value={
+                filters.ratingMin == null ? "any" : String(filters.ratingMin)
+              }
+              onValueChange={(v) =>
+                setFilters((f) => {
+                  const min = v === "any" ? null : Number(v);
+                  return {
+                    ...f,
+                    ratingMin: min,
+                    ratingMax:
+                      min != null && f.ratingMax != null && f.ratingMax < min
+                        ? min
+                        : f.ratingMax,
+                  };
+                })
+              }
+            >
+              <SelectTrigger className="h-8 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} ★
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">to</span>
+            <Select
+              value={
+                filters.ratingMax == null ? "any" : String(filters.ratingMax)
+              }
+              onValueChange={(v) =>
+                setFilters((f) => {
+                  const max = v === "any" ? null : Number(v);
+                  return {
+                    ...f,
+                    ratingMax: max,
+                    ratingMin:
+                      max != null && f.ratingMin != null && f.ratingMin > max
+                        ? max
+                        : f.ratingMin,
+                  };
+                })
+              }
+            >
+              <SelectTrigger className="h-8 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} ★
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Status
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {STATUS_OPTIONS.map((s) => {
+              const active = filters.statuses.includes(s.value);
+              return (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() =>
+                    setFilters((f) => ({
+                      ...f,
+                      statuses: active
+                        ? f.statuses.filter((x) => x !== s.value)
+                        : [...f.statuses, s.value],
+                    }))
+                  }
+                  className="px-2.5 py-1 rounded-full text-xs font-medium border transition"
+                  style={{
+                    backgroundColor: active ? s.color : `${s.color}20`,
+                    color: active ? "#fff" : s.color,
+                    borderColor: `${s.color}80`,
+                  }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
+  const renderMetaRow = (s: {
+    rating?: number | null;
+    status?: string | null;
+  }) => {
+    const showStatus = !!s.status && s.status !== "new";
+    if (s.rating == null && !showStatus) return null;
+    return (
+      <div className="flex items-center gap-1.5 mt-1">
+        {s.rating != null && (
+          <span className="flex items-center gap-0.5">
+            {Array.from({ length: s.rating }).map((_, i) => (
+              <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+            ))}
+          </span>
+        )}
+        {showStatus && (
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+            style={{
+              backgroundColor: `${statusColor(s.status)}22`,
+              color: statusColor(s.status),
+            }}
+          >
+            {statusLabel(s.status)}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="p-4 border-b border-sidebar-border">
@@ -348,14 +570,17 @@ export default function Sidebar() {
         <ScrollArea className="h-full">
           {activeTab === "songs" && !activeSetId && (
             <div className="p-4 space-y-3">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                <Input
-                  placeholder="Search songs..."
-                  className="pl-9 bg-background/50 border-sidebar-border h-10"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                  <Input
+                    placeholder="Search songs..."
+                    className="pl-9 bg-background/50 border-sidebar-border h-10"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                {renderFilters()}
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -474,6 +699,10 @@ export default function Sidebar() {
                   <div className="text-center p-4 text-muted-foreground">
                     No songs found.
                   </div>
+                ) : filteredSongs.length === 0 ? (
+                  <div className="text-center p-4 text-muted-foreground">
+                    No songs match your filters.
+                  </div>
                 ) : (
                   grouped.map(([letter, items]) => (
                     <div key={letter}>
@@ -531,6 +760,7 @@ export default function Sidebar() {
                                     ))}
                                   </div>
                                 )}
+                                {renderMetaRow(song)}
                               </button>
                               {lastPlayedSongId === song.id && (
                                 <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
@@ -555,6 +785,34 @@ export default function Sidebar() {
                                       >
                                         <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
                                       </DropdownMenuItem>
+                                      <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger>
+                                          <ListPlus className="w-3.5 h-3.5 mr-2" />
+                                          Add to set
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent>
+                                          {sets.length === 0 ? (
+                                            <DropdownMenuItem disabled>
+                                              No sets yet
+                                            </DropdownMenuItem>
+                                          ) : (
+                                            sets.map((set) => (
+                                              <DropdownMenuItem
+                                                key={set.id}
+                                                onClick={() =>
+                                                  handleAddSongToSet(
+                                                    song.id,
+                                                    set.id,
+                                                    set.title,
+                                                  )
+                                                }
+                                              >
+                                                {set.title}
+                                              </DropdownMenuItem>
+                                            ))
+                                          )}
+                                        </DropdownMenuSubContent>
+                                      </DropdownMenuSub>
                                       <DropdownMenuItem
                                         className="text-destructive focus:text-destructive"
                                         onClick={() => handleDeleteSong(song)}
@@ -612,38 +870,53 @@ export default function Sidebar() {
                       This set has no songs.
                     </div>
                   ) : (
-                    <div className="space-y-0.5">
-                      {activeSet.songs.map((song, i) => {
-                        const isCurrent = selectedSongId === song.id;
-                        const isLast = lastPlayedSongId === song.id;
-                        return (
-                          <button
-                            key={song.id}
-                            onClick={() => handleSelectSong(song.id)}
-                            className={`group flex items-center gap-3 w-full text-left rounded-md p-2.5 transition-colors ${
-                              isCurrent
-                                ? "bg-primary/20"
-                                : "hover:bg-sidebar-accent"
-                            } ${isLast ? "ring-1 ring-primary/60" : ""}`}
-                          >
-                            <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full text-xs font-bold text-muted-foreground shrink-0">
-                              {i + 1}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-foreground truncate">
-                                {song.title}
-                              </div>
-                              <div className="text-sm text-muted-foreground truncate">
-                                {song.artist}
-                              </div>
-                            </div>
-                            {isLast && (
-                              <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {visibleSetSongs.length}/{activeSet.songs.length} songs
+                        </span>
+                        {renderFilters()}
+                      </div>
+                      {visibleSetSongs.length === 0 ? (
+                        <div className="text-center p-4 text-muted-foreground text-sm">
+                          No songs match your filters.
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {visibleSetSongs.map(({ song, position }) => {
+                            const isCurrent = selectedSongId === song.id;
+                            const isLast = lastPlayedSongId === song.id;
+                            return (
+                              <button
+                                key={song.id}
+                                onClick={() => handleSelectSong(song.id)}
+                                className={`group flex items-center gap-3 w-full text-left rounded-md p-2.5 transition-colors ${
+                                  isCurrent
+                                    ? "bg-primary/20"
+                                    : "hover:bg-sidebar-accent"
+                                } ${isLast ? "ring-1 ring-primary/60" : ""}`}
+                              >
+                                <div className="w-6 h-6 flex items-center justify-center bg-muted rounded-full text-xs font-bold text-muted-foreground shrink-0">
+                                  {position}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-foreground truncate">
+                                    {song.title}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground truncate">
+                                    {song.artist}
+                                  </div>
+                                  {renderMetaRow(song)}
+                                </div>
+                                {isLast && (
+                                  <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -714,6 +987,9 @@ export default function Sidebar() {
         open={editorOpen}
         onOpenChange={setEditorOpen}
         onSaved={(id) => {
+          if (activeSetId) {
+            qc.invalidateQueries({ queryKey: getGetSetQueryKey(activeSetId) });
+          }
           if (!selectMode) {
             setSelectedSongId(id);
             setSidebarOpen(false);

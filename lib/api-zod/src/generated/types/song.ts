@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SongMediaType } from './songMediaType';
+import type { SongStatus } from './songStatus';
 import type { Tag } from './tag';
 
 export interface Song {
@@ -30,6 +31,13 @@ export interface Song {
   audioSize?: number | null;
   /** @nullable */
   youtubeUrl?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating: number | null;
+  status: SongStatus;
   createdAt: string;
   tags?: Tag[];
 }

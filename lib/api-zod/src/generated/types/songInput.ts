@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SongInputMediaType } from './songInputMediaType';
+import type { SongInputStatus } from './songInputStatus';
 
 export interface SongInput {
   title: string;
@@ -15,4 +16,11 @@ export interface SongInput {
   spotifyLink?: string;
   youtubeUrl?: string;
   mediaType?: SongInputMediaType;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  status?: SongInputStatus;
 }

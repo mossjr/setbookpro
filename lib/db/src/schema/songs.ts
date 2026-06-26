@@ -17,6 +17,9 @@ export const songsTable = pgTable("songs", {
   audioContentType: text("audio_content_type"),
   audioSize: integer("audio_size"),
   youtubeUrl: text("youtube_url"),
+  // Practice metadata: 1-5 star rating (null = unrated) and performability status.
+  rating: integer("rating"),
+  status: text("status").notNull().default("new"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SongUpdateMediaType } from './songUpdateMediaType';
+import type { SongUpdateStatus } from './songUpdateStatus';
 
 export interface SongUpdate {
   title?: string;
@@ -25,4 +26,11 @@ export interface SongUpdate {
   audioSize?: number | null;
   /** @nullable */
   youtubeUrl?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  status?: SongUpdateStatus;
 }

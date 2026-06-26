@@ -29,6 +29,8 @@ async function getSetWithSongs(setId: string) {
       title: songsTable.title,
       artist: songsTable.artist,
       meta: songsTable.meta,
+      rating: songsTable.rating,
+      status: songsTable.status,
       sortOrder: setSongsTable.sortOrder,
     })
     .from(setSongsTable)

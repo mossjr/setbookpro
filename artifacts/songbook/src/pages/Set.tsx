@@ -183,6 +183,12 @@ export default function SetView() {
     }),
   );
 
+  // Monotonic token shared by every set mutation. Responses that resolve out of
+  // order (an older reorder/remove landing after a newer one) are ignored so a
+  // stale server payload or rollback can't clobber the latest intended state.
+  // Must stay above the early returns so hook order is stable across renders.
+  const opSeqRef = useRef(0);
+
   if (isLoading)
     return (
       <div className="p-8 text-center text-muted-foreground">Loading set...</div>
@@ -192,7 +198,7 @@ export default function SetView() {
       <div className="p-8 text-center text-muted-foreground">Set not found</div>
     );
 
-  const songs = set.songs;
+  const songs = set.songs ?? [];
 
   const startSong = (songId: string) => {
     setActiveSetId(set.id);
@@ -202,11 +208,6 @@ export default function SetView() {
   };
 
   const setKey = getGetSetQueryKey(setId);
-
-  // Monotonic token shared by every set mutation. Responses that resolve out of
-  // order (an older reorder/remove landing after a newer one) are ignored so a
-  // stale server payload or rollback can't clobber the latest intended state.
-  const opSeqRef = useRef(0);
 
   // Persist a new full ordering. Applies an optimistic cache update, sends the
   // ordered ids to the server, and rolls back if the request fails.

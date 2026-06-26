@@ -5,6 +5,7 @@
  * SongBook API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SetSongStatus } from './setSongStatus';
 
 export interface SetSong {
   id: string;
@@ -12,5 +13,12 @@ export interface SetSong {
   artist: string;
   /** @nullable */
   meta?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  status: SetSongStatus;
   sortOrder: number;
 }

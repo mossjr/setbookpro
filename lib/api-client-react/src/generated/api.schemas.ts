@@ -83,6 +83,16 @@ export const SongMediaType = {
   youtube: 'youtube',
 } as const;
 
+export type SongStatus = typeof SongStatus[keyof typeof SongStatus];
+
+
+export const SongStatus = {
+  new: 'new',
+  practicing: 'practicing',
+  polishing: 'polishing',
+  performance_ready: 'performance_ready',
+} as const;
+
 export interface Song {
   id: string;
   title: string;
@@ -105,6 +115,13 @@ export interface Song {
   audioSize?: number | null;
   /** @nullable */
   youtubeUrl?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating: number | null;
+  status: SongStatus;
   createdAt: string;
   tags?: Tag[];
 }
@@ -119,6 +136,16 @@ export const SongInputMediaType = {
   youtube: 'youtube',
 } as const;
 
+export type SongInputStatus = typeof SongInputStatus[keyof typeof SongInputStatus];
+
+
+export const SongInputStatus = {
+  new: 'new',
+  practicing: 'practicing',
+  polishing: 'polishing',
+  performance_ready: 'performance_ready',
+} as const;
+
 export interface SongInput {
   title: string;
   artist: string;
@@ -127,6 +154,13 @@ export interface SongInput {
   spotifyLink?: string;
   youtubeUrl?: string;
   mediaType?: SongInputMediaType;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  status?: SongInputStatus;
 }
 
 export type SongUpdateMediaType = typeof SongUpdateMediaType[keyof typeof SongUpdateMediaType];
@@ -137,6 +171,16 @@ export const SongUpdateMediaType = {
   audio: 'audio',
   spotify: 'spotify',
   youtube: 'youtube',
+} as const;
+
+export type SongUpdateStatus = typeof SongUpdateStatus[keyof typeof SongUpdateStatus];
+
+
+export const SongUpdateStatus = {
+  new: 'new',
+  practicing: 'practicing',
+  polishing: 'polishing',
+  performance_ready: 'performance_ready',
 } as const;
 
 export interface SongUpdate {
@@ -157,6 +201,13 @@ export interface SongUpdate {
   audioSize?: number | null;
   /** @nullable */
   youtubeUrl?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  status?: SongUpdateStatus;
 }
 
 export interface SongSet {
@@ -174,12 +225,29 @@ export interface SongSetUpdate {
   title?: string;
 }
 
+export type SetSongStatus = typeof SetSongStatus[keyof typeof SetSongStatus];
+
+
+export const SetSongStatus = {
+  new: 'new',
+  practicing: 'practicing',
+  polishing: 'polishing',
+  performance_ready: 'performance_ready',
+} as const;
+
 export interface SetSong {
   id: string;
   title: string;
   artist: string;
   /** @nullable */
   meta?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  status: SetSongStatus;
   sortOrder: number;
 }
 

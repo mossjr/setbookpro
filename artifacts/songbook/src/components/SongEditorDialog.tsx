@@ -5,6 +5,7 @@ import {
   useUpdateSong,
   useListTags,
   getListTagsQueryKey,
+  useCreateTag,
   useAddTagToSong,
   useRemoveTagFromSong,
   getListSongsQueryKey,
@@ -19,10 +20,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Star, Plus } from "lucide-react";
+import { STATUS_OPTIONS, TAG_PALETTE, type SongStatus } from "@/lib/songMeta";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {
@@ -46,13 +56,17 @@ export default function SongEditorDialog({
   const [artist, setArtist] = useState("");
   const [meta, setMeta] = useState("");
   const [lyricsChords, setLyricsChords] = useState("");
+  const [rating, setRating] = useState<number | null>(null);
+  const [status, setStatus] = useState<SongStatus>("new");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [newTagName, setNewTagName] = useState("");
 
   const { data: tags = [] } = useListTags({
     query: { queryKey: getListTagsQueryKey() },
   });
   const createSong = useCreateSong();
   const updateSong = useUpdateSong();
+  const createTag = useCreateTag();
   const addTag = useAddTagToSong();
   const removeTag = useRemoveTagFromSong();
 
@@ -62,7 +76,10 @@ export default function SongEditorDialog({
       setArtist(song?.artist ?? "");
       setMeta(song?.meta ?? "");
       setLyricsChords(song?.lyricsChords ?? "");
+      setRating(song?.rating ?? null);
+      setStatus((song?.status as SongStatus) ?? "new");
       setSelectedTags(song?.tags?.map((t) => t.id) ?? []);
+      setNewTagName("");
     }
   }, [open, song]);
 
@@ -79,6 +96,26 @@ export default function SongEditorDialog({
     if (id) qc.invalidateQueries({ queryKey: getGetSongQueryKey(id) });
   };
 
+  const handleCreateTag = () => {
+    const name = newTagName.trim();
+    if (!name || createTag.isPending) return;
+    const color = TAG_PALETTE[tags.length % TAG_PALETTE.length];
+    createTag.mutate(
+      { data: { name, color } },
+      {
+        onSuccess: (tag) => {
+          setNewTagName("");
+          setSelectedTags((prev) =>
+            prev.includes(tag.id) ? prev : [...prev, tag.id],
+          );
+          qc.invalidateQueries({ queryKey: getListTagsQueryKey() });
+        },
+        onError: () =>
+          toast({ title: "Could not create tag", variant: "destructive" }),
+      },
+    );
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       toast({ title: "Title is required", variant: "destructive" });
@@ -93,6 +130,8 @@ export default function SongEditorDialog({
             artist: artist.trim(),
             meta: meta.trim(),
             lyricsChords,
+            rating,
+            status,
           },
         });
         const current = song.tags?.map((t) => t.id) ?? [];
@@ -116,6 +155,8 @@ export default function SongEditorDialog({
             artist: artist.trim(),
             meta: meta.trim(),
             lyricsChords,
+            rating,
+            status,
           },
         });
         const newId = (created as Song).id;
@@ -167,9 +208,60 @@ export default function SongEditorDialog({
               placeholder="e.g. Key of G, capo 2"
             />
           </div>
-          {tags.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Tags</Label>
+              <Label>Rating</Label>
+              <div className="flex items-center gap-1 h-10">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setRating(rating === n ? null : n)}
+                    className="p-0.5"
+                    aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                  >
+                    <Star
+                      className={`w-6 h-6 transition-colors ${
+                        rating != null && n <= rating
+                          ? "fill-amber-400 text-amber-400"
+                          : "text-muted-foreground/40 hover:text-muted-foreground"
+                      }`}
+                    />
+                  </button>
+                ))}
+                {rating != null && (
+                  <button
+                    type="button"
+                    onClick={() => setRating(null)}
+                    className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={status}
+                onValueChange={(v) => setStatus(v as SongStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            {tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {tags.map((t) => {
                   const sel = selectedTags.includes(t.id);
@@ -190,8 +282,31 @@ export default function SongEditorDialog({
                   );
                 })}
               </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Create a new tag..."
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateTag();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleCreateTag}
+                disabled={!newTagName.trim() || createTag.isPending}
+                aria-label="Create tag"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
-          )}
+          </div>
           <div className="space-y-2">
             <Label>Lyrics &amp; chords</Label>
             <Textarea

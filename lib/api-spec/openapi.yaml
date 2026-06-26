@@ -824,7 +824,7 @@ components:
 
     Song:
       type: object
-      required: [id, title, artist, lyricsChords, mediaType, createdAt]
+      required: [id, title, artist, lyricsChords, mediaType, rating, status, createdAt]
       properties:
         id:
           type: string
@@ -853,6 +853,13 @@ components:
           type: ["integer", "null"]
         youtubeUrl:
           type: ["string", "null"]
+        rating:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 5
+        status:
+          type: string
+          enum: [new, practicing, polishing, performance_ready]
         createdAt:
           type: string
         tags:
@@ -879,6 +886,13 @@ components:
         mediaType:
           type: string
           enum: [none, audio, spotify, youtube]
+        rating:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 5
+        status:
+          type: string
+          enum: [new, practicing, polishing, performance_ready]
 
     SongUpdate:
       type: object
@@ -906,6 +920,13 @@ components:
           type: ["integer", "null"]
         youtubeUrl:
           type: ["string", "null"]
+        rating:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 5
+        status:
+          type: string
+          enum: [new, practicing, polishing, performance_ready]
 
     SongSet:
       type: object
@@ -935,7 +956,7 @@ components:
 
     SetSong:
       type: object
-      required: [id, title, artist, sortOrder]
+      required: [id, title, artist, sortOrder, status]
       properties:
         id:
           type: string
@@ -945,6 +966,13 @@ components:
           type: string
         meta:
           type: ["string", "null"]
+        rating:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 5
+        status:
+          type: string
+          enum: [new, practicing, polishing, performance_ready]
         sortOrder:
           type: integer
 
