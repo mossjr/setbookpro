@@ -1,0 +1,73 @@
+I have copied a replit app from another account as a download zip and upload zip and we need to connect it to both a new database as well as file storage. 
+
+CREATE SCHEMA "public";
+CREATE TABLE "set_songs" (
+	"set_id" uuid,
+	"song_id" uuid,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "set_songs_set_id_song_id_pk" PRIMARY KEY("set_id","song_id")
+);
+CREATE TABLE "sets" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"title" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "song_tags" (
+	"song_id" uuid,
+	"tag_id" uuid,
+	CONSTRAINT "song_tags_song_id_tag_id_pk" PRIMARY KEY("song_id","tag_id")
+);
+CREATE TABLE "songs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"title" text NOT NULL,
+	"artist" text NOT NULL,
+	"meta" text,
+	"lyrics_chords" text DEFAULT '' NOT NULL,
+	"original_ug_id" text,
+	"spotify_link" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"media_type" text DEFAULT 'none' NOT NULL,
+	"audio_url" text,
+	"audio_file_name" text,
+	"audio_content_type" text,
+	"audio_size" integer,
+	"youtube_url" text,
+	"rating" integer,
+	"status" text DEFAULT 'new' NOT NULL
+);
+CREATE TABLE "tags" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"name" text NOT NULL,
+	"color" text DEFAULT '#6366f1' NOT NULL
+);
+ALTER TABLE "set_songs" ADD CONSTRAINT "set_songs_set_id_sets_id_fk" FOREIGN KEY ("set_id") REFERENCES "sets"("id") ON DELETE CASCADE;
+ALTER TABLE "set_songs" ADD CONSTRAINT "set_songs_song_id_songs_id_fk" FOREIGN KEY ("song_id") REFERENCES "songs"("id") ON DELETE CASCADE;
+ALTER TABLE "song_tags" ADD CONSTRAINT "song_tags_song_id_songs_id_fk" FOREIGN KEY ("song_id") REFERENCES "songs"("id") ON DELETE CASCADE;
+ALTER TABLE "song_tags" ADD CONSTRAINT "song_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "tags"("id") ON DELETE CASCADE;
+CREATE UNIQUE INDEX "set_songs_set_id_song_id_pk" ON "set_songs" ("set_id","song_id");
+CREATE UNIQUE INDEX "sets_pkey" ON "sets" ("id");
+CREATE UNIQUE INDEX "song_tags_song_id_tag_id_pk" ON "song_tags" ("song_id","tag_id");
+CREATE UNIQUE INDEX "songs_pkey" ON "songs" ("id");
+CREATE UNIQUE INDEX "tags_pkey" ON "tags" ("id");
+
+
+Above is the database schema as copied from the other app. 
+
+The secrets are as follows (I will change anything sensitive prior to deployment)
+{
+  "SESSION_SECRET": "RY0BAg4atLfKjoEWqqTpShS4clHXXvDLvb8fDcFgZSEe+lD6HzeJvr+n891EzejdS9VMOXCM/5Zcl/2B+94A/g==",
+  "APP_PASSWORD": "youngfire667",
+  "DEFAULT_OBJECT_STORAGE_BUCKET_ID": "replit-objstore-ec8ca145-209c-4b72-b147-bb07ea7f45f0",
+  "PUBLIC_OBJECT_SEARCH_PATHS": "/replit-objstore-ec8ca145-209c-4b72-b147-bb07ea7f45f0/public",
+  "PRIVATE_OBJECT_DIR": "/replit-objstore-ec8ca145-209c-4b72-b147-bb07ea7f45f0/.private",
+  "SPOTIFY_CLIENT_ID": "5ad5993a67114e3bb62ac2a5fd8e08d9",
+  "SPOTIFY_CLIENT_SECRET": "c6ae3639a5714a69b28f3161f868dc45",
+  "FIRECRAWL_API_KEY": "fc-debac4048d01416b9c00e05b6262f204"
+}
+
+Bear in mind that the DEFAULT_OBJECT_STORAGE_BUCKET_ID is the bucket from the old project so will not be valid for this one, we will need to update with the id of the newly created bucket
+
+Same with paths as appropriate
+
+
+Inspect the project and see if there is anything else you need to hook everything up. Once we have it working I will add the setbook.pro domain to the deployment. I’m not too worried about the actual data in the old database unless it’s absolutely required to make this work. 
